@@ -1,0 +1,33 @@
+.dark .fi-ta-text {
+    color: rgb(229 231 235) !important;
+}
+
+.dark .fi-section-header-heading {
+    color: rgb(229 231 235) !important;
+}
+
+.dark .fi-section {
+    background-color: rgb(31 41 55) !important;
+    border-color: rgb(55 65 81) !important;
+}
+
+.dark .fi-badge {
+    background-color: rgb(55 65 81) !important;
+    color: rgb(229 231 235) !important;
+}
+
+.dark .attach-file-label {
+    color: rgb(229 231 235) !important;
+    background-color: rgb(55 65 81) !important;
+    border-color: rgb(75 85 99) !important;
+}
+
+.dark .fi-fo-file-upload-dropzone {
+    background-color: rgb(31 41 55) !important;
+    border-color: rgb(75 85 99) !important;
+    color: rgb(229 231 235) !important;
+}
+
+.dark .fi-fo-file-upload-dropzone-text {
+    color: rgb(229 231 235) !important;
+}
