@@ -35,9 +35,9 @@ class PendingAgreementOverviewResource extends Resource
             ->where('is_draft', false)
             ->where(function ($query) use ($user) {
                 // Show AOs that need approval from current user based on their role and current status
-                if ($user->role === 'head') {
+                if (in_array($user->role, ['head', 'manager', 'senior_manager'])) {
                     $query->where('status', AgreementOverview::STATUS_PENDING_HEAD);
-                } elseif ($user->role === 'general_manager') {
+                } elseif (in_array($user->role, ['general_manager', 'senior_manager'])) {
                     $query->where('status', AgreementOverview::STATUS_PENDING_GM);
                 } elseif ($user->role === 'finance') {
                     $query->where('status', AgreementOverview::STATUS_PENDING_FINANCE);
@@ -72,11 +72,22 @@ class PendingAgreementOverviewResource extends Resource
                     ->schema([
                         Forms\Components\Radio::make('approval_decision')
                             ->label('Decision')
-                            ->options([
-                                'approve' => 'Approve',
-                                'reject' => 'Reject',
-                                'rediscuss' => 'Send to Re-discussion',
-                            ])
+                            ->options(function () {
+                                $user = auth()->user();
+
+                                // Default opsi untuk semua role
+                                $options = [
+                                    'approve' => 'Approve',
+                                    'reject' => 'Reject',
+                                ];
+
+                                // Kalau role director1 atau director2, tambahkan opsi re-discussion
+                                if (in_array($user->role, ['director1', 'director2'])) {
+                                    $options['rediscuss'] = 'Send to Re-discussion';
+                                }
+
+                                return $options;
+                            })
                             ->required()
                             ->reactive()
                             ->default('approve'),
@@ -223,6 +234,75 @@ class PendingAgreementOverviewResource extends Resource
                 Tables\Actions\ViewAction::make()
                     ->slideOver(),
                 
+                Tables\Actions\Action::make('approve')
+                    ->label('Approve')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Approve Agreement Overview')
+                    ->modalDescription('Are you sure you want to approve this agreement overview?')
+                    ->modalSubmitActionLabel('Approve')
+                    ->visible(fn (AgreementOverview $record) =>
+                        app(DocumentWorkflowService::class)
+                            ->canUserApproveAgreementOverview(auth()->user(), $record)
+                    )
+                    ->action(function (AgreementOverview $record, array $data) {
+                        $workflowService = app(DocumentWorkflowService::class);
+
+                        $workflowService->approveAgreementOverview(
+                            $record,
+                            auth()->user(),
+                            $data['approval_comments'] ?? 'Approved'
+                        );
+
+                        Notification::make()
+                            ->title('Agreement Overview Approved')
+                            ->body('The agreement overview has been successfully approved.')
+                            ->success()
+                            ->send();
+                    })
+                    ->form([
+                        Forms\Components\Textarea::make('approval_comments')
+                            ->label('Approval Comments')
+                            ->rows(3)
+                            ->helperText('Optional: Add your comments for this approval'),
+                    ]),
+
+                Tables\Actions\Action::make('reject')
+                    ->label('Reject')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Reject Agreement Overview')
+                    ->modalDescription('Are you sure you want to reject this agreement overview?')
+                    ->modalSubmitActionLabel('Reject')
+                    ->visible(fn (AgreementOverview $record) =>
+                        app(DocumentWorkflowService::class)
+                            ->canUserApproveAgreementOverview(auth()->user(), $record)
+                    )
+                    ->action(function (AgreementOverview $record, array $data) {
+                        $workflowService = app(DocumentWorkflowService::class);
+
+                        $workflowService->rejectAgreementOverview(
+                            $record,
+                            auth()->user(),
+                            $data['rejection_reason']
+                        );
+
+                        Notification::make()
+                            ->title('Agreement Overview Rejected')
+                            ->body('The agreement overview has been rejected and returned to the requester.')
+                            ->danger()
+                            ->send();
+                    })
+                    ->form([
+                        Forms\Components\Textarea::make('rejection_reason')
+                            ->label('Rejection Reason')
+                            ->required()
+                            ->rows(3)
+                            ->helperText('Please provide a clear reason for rejection'),
+                    ]),
+
                 Tables\Actions\Action::make('quick_approve')
                     ->label('Quick Approve')
                     ->icon('heroicon-o-check-circle')
@@ -231,6 +311,10 @@ class PendingAgreementOverviewResource extends Resource
                     ->modalHeading('Quick Approve Agreement Overview')
                     ->modalDescription('Are you sure you want to approve this agreement overview?')
                     ->modalSubmitActionLabel('Approve')
+                    ->visible(fn (AgreementOverview $record) =>
+                        app(DocumentWorkflowService::class)
+                            ->canUserApproveAgreementOverview(auth()->user(), $record)
+                    )
                     ->action(function (AgreementOverview $record) {
                         $workflowService = app(DocumentWorkflowService::class);
                         
@@ -251,7 +335,8 @@ class PendingAgreementOverviewResource extends Resource
                             ->success()
                             ->send();
                     }),
-                
+                    
+                /*
                 Tables\Actions\Action::make('detailed_review')
                     ->label('Detailed Review')
                     ->icon('heroicon-o-document-magnifying-glass')
@@ -259,11 +344,22 @@ class PendingAgreementOverviewResource extends Resource
                     ->form([
                         Forms\Components\Radio::make('approval_decision')
                             ->label('Decision')
-                            ->options([
-                                'approve' => 'Approve',
-                                'reject' => 'Reject',
-                                'rediscuss' => 'Send to Re-discussion',
-                            ])
+                            ->options(function () {
+                                $user = auth()->user();
+
+                                // Default opsi untuk semua role
+                                $options = [
+                                    'approve' => 'Approve',
+                                    'reject' => 'Reject',
+                                ];
+
+                                // Kalau role director1 atau director2, tambahkan opsi re-discussion
+                                if (in_array($user->role, ['director1', 'director2'])) {
+                                    $options['rediscuss'] = 'Send to Re-discussion';
+                                }
+
+                                return $options;
+                            })
                             ->required()
                             ->reactive()
                             ->default('approve'),
@@ -307,7 +403,9 @@ class PendingAgreementOverviewResource extends Resource
                             ->success()
                             ->send();
                     }),
-            ])
+                    */
+            ])  
+
             ->bulkActions([
                 Tables\Actions\BulkAction::make('bulk_approve')
                     ->label('Bulk Approve Selected')
@@ -360,7 +458,7 @@ class PendingAgreementOverviewResource extends Resource
                                     ->date(),
                             ]),
                         
-                        Infolists\Components\Grid::make(2)
+                        Infolists\Components\Grid::make(3)
                             ->schema([
                                 Infolists\Components\TextEntry::make('counterparty')
                                     ->label('Counterparty'),
@@ -412,18 +510,49 @@ class PendingAgreementOverviewResource extends Resource
                             ->columnSpanFull(),
                     ]),
 
+                // Workflow Steps Visual
                 Infolists\Components\Section::make('Workflow Progress')
                     ->schema([
-                        Infolists\Components\ViewEntry::make('workflow_progress')
-                            ->view('filament.components.workflow-progress')
-                            ->viewData(function ($record) {
-                                $workflowService = app(DocumentWorkflowService::class);
-                                return [
-                                    'progress' => $workflowService->getAgreementOverviewProgress($record),
-                                    'current_status' => $record->status,
+                        Infolists\Components\TextEntry::make('workflow_steps')
+                            ->getStateUsing(function ($record) {
+                                $steps = [
+                                    'draft' => '📝 Draft',
+                                    'pending_head' => '👨‍💼 Head Review',
+                                    'pending_gm' => '🎯 GM Review',
+                                    'pending_finance' => '💰 Finance Review',
+                                    'pending_legal' => '⚖️ Legal Review',
+                                    'pending_director1' => '👔 Director 1 Review',
+                                    'pending_director2' => '👔 Director 2 Review',
+                                    'approved' => '✅ Fully Approved',
                                 ];
-                            }),
-                    ]),
+
+                                $currentStatus = $record->status;
+                                $stepKeys = array_keys($steps);
+                                $currentIndex = array_search($currentStatus, $stepKeys);
+                                $html = '<div class="space-y-2">';
+
+                                foreach ($steps as $stepStatus => $stepLabel) {
+                                    $stepIndex = array_search($stepStatus, $stepKeys);
+                                    $isCompleted = $stepIndex < $currentIndex || $currentStatus === 'approved';
+                                    $isCurrent = $stepStatus === $currentStatus;
+
+                                    if ($isCompleted) {
+                                        $html .= "<div class='text-green-600 font-medium'>✅ {$stepLabel}</div>";
+                                    } elseif ($isCurrent) {
+                                        $html .= "<div class='text-blue-600 font-bold'>🔄 {$stepLabel} (Current)</div>";
+                                    } else {
+                                        $html .= "<div class='text-gray-400'>⏳ {$stepLabel}</div>";
+                                    }
+                                }
+
+                                $html .= '</div>';
+                                return $html;
+                            })
+                            ->html()
+                            ->columnSpanFull()
+                            ->visible(fn($record) => !$record->is_draft),
+                    ])
+                    ->columns(2),
             ]);
     }
 

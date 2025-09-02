@@ -5,6 +5,8 @@ namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\AgreementOverviewResource\Pages;
 use App\Models\AgreementOverview;
+use App\Models\DocumentApproval;
+use App\Services\DocumentWorkflowService;
 use App\Enums\DocumentStatus;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -15,6 +17,7 @@ use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Notifications\Notification;
 
 class AgreementOverviewResource extends Resource
 {
@@ -231,20 +234,112 @@ class AgreementOverviewResource extends Resource
                         0 => 'Final',
                     ]),
             ])
+
             ->actions([
                 Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
                 Tables\Actions\Action::make('approve')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
                     ->requiresConfirmation()
-                    ->visible(fn($record) => $record->status === 'pending_approval')
-                    ->action(function ($record) {
-                        $record->update([
-                            'status' => 'approved',
-                            'completed_at' => now(),
-                        ]);
-                    }),
+                    ->visible(fn (AgreementOverview $record) =>
+                        app(DocumentWorkflowService::class)
+                            ->canUserApproveAgreementOverview(auth()->user(), $record)
+                    )
+                    ->action(function (AgreementOverview $record, array $data) {
+                        $workflowService = app(DocumentWorkflowService::class);
+
+                        $workflowService->approveAgreementOverview(
+                            $record,
+                            auth()->user(),
+                            $data['approval_comments'] ?? 'Approved'
+                        );
+
+                        Notification::make()
+                            ->title('Agreement Overview Approved')
+                            ->body('The agreement overview has been successfully approved.')
+                            ->success()
+                            ->send();
+                    })
+                    ->form([
+                        Forms\Components\Textarea::make('approval_comments')
+                            ->label('Approval Comments')
+                            ->rows(3)
+                            ->helperText('Optional: Add your comments for this approval'),
+                    ]),
+
+                Tables\Actions\Action::make('reject')
+                    ->label('Reject')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Reject Agreement Overview')
+                    ->modalDescription('Are you sure you want to reject this agreement overview?')
+                    ->modalSubmitActionLabel('Reject')
+                    ->visible(fn (AgreementOverview $record) =>
+                        auth()->user()->role === 'director' &&
+                        app(DocumentWorkflowService::class)
+                            ->canUserApproveAgreementOverview(auth()->user(), $record)
+                    )
+                    ->action(function (AgreementOverview $record, array $data) {
+                        $workflowService = app(DocumentWorkflowService::class);
+
+                        $workflowService->rejectAgreementOverview(
+                            $record,
+                            auth()->user(),
+                            $data['rejection_reason']
+                        );
+
+                        Notification::make()
+                            ->title('Agreement Overview Rejected')
+                            ->body('The agreement overview has been rejected and returned to the requester.')
+                            ->danger()
+                            ->send();
+                    })
+                    ->form([
+                        Forms\Components\Textarea::make('rejection_reason')
+                            ->label('Rejection Reason')
+                            ->required()
+                            ->rows(3)
+                            ->helperText('Please provide a clear reason for rejection'),
+                    ]),
+
+                Tables\Actions\Action::make('send_to_rediscuss')
+                    ->label('Send to Rediscuss')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Send Agreement Overview to Rediscussion')
+                    ->modalDescription('Are you sure you want to send this agreement overview back to discussion?')
+                    ->modalSubmitActionLabel('Send Back')
+                    ->visible(fn (AgreementOverview $record) =>
+                        auth()->user()->role === 'director' &&
+                        in_array($record->status, [
+                            AgreementOverview::STATUS_PENDING_DIRECTOR1,
+                            AgreementOverview::STATUS_PENDING_DIRECTOR2,
+                        ])
+                    )
+                    ->action(function (AgreementOverview $record, array $data) {
+                        $workflowService = app(DocumentWorkflowService::class);
+
+                        $workflowService->sendAgreementOverviewToRediscussion(
+                   $record,
+                            auth()->user(),
+                            $data['rediscussion_comments'] ?? 'Sent back to discussion'
+                        );
+
+                        Notification::make()
+                            ->title('Agreement Overview Sent Back')
+                            ->body('The agreement overview has been sent back to forum discussion.')
+                            ->warning()
+                            ->send();
+                    })
+                    ->form([
+                        Forms\Components\Textarea::make('rediscussion_comments')
+                            ->label('Rediscussion Comments')
+                            ->rows(3)
+                            ->helperText('Optional: Add your comments for this rediscussion'),
+                    ]),
+                    
                 Tables\Actions\Action::make('download_pdf')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('info')
@@ -321,6 +416,50 @@ class AgreementOverviewResource extends Resource
                             ->columnSpanFull(),
                     ]),
 
+            // Workflow Steps Visual
+            Infolists\Components\Section::make('Workflow Progress')
+                ->schema([
+                    Infolists\Components\TextEntry::make('workflow_steps')
+                        ->getStateUsing(function ($record) {
+                            $steps = [
+                                'draft' => '📝 Draft',
+                                'pending_head' => '👨‍💼 Head Review',
+                                'pending_gm' => '🎯 GM Review',
+                                'pending_finance' => '💰 Finance Review',
+                                'pending_legal' => '⚖️ Legal Review',
+                                'pending_director1' => '👔 Director 1 Review',
+                                'pending_director2' => '👔 Director 2 Review',
+                                'approved' => '✅ Fully Approved',
+                            ];
+
+                            $currentStatus = $record->status;
+                            $stepKeys = array_keys($steps);
+                            $currentIndex = array_search($currentStatus, $stepKeys);
+                            $html = '<div class="space-y-2">';
+
+                            foreach ($steps as $stepStatus => $stepLabel) {
+                                $stepIndex = array_search($stepStatus, $stepKeys);
+                                $isCompleted = $stepIndex < $currentIndex || $currentStatus === 'approved';
+                                $isCurrent = $stepStatus === $currentStatus;
+
+                                if ($isCompleted) {
+                                    $html .= "<div class='text-green-600 font-medium'>✅ {$stepLabel}</div>";
+                                } elseif ($isCurrent) {
+                                    $html .= "<div class='text-blue-600 font-bold'>🔄 {$stepLabel} (Current)</div>";
+                                } else {
+                                    $html .= "<div class='text-gray-400'>⏳ {$stepLabel}</div>";
+                                }
+                            }
+
+                            $html .= '</div>';
+                            return $html;
+                        })
+                        ->html()
+                        ->columnSpanFull()
+                        ->visible(fn($record) => !$record->is_draft),
+                ])
+                ->columns(2),
+
                 Infolists\Components\Section::make('Approval History')
                     ->schema([
                         Infolists\Components\RepeatableEntry::make('approvals')
@@ -342,9 +481,7 @@ class AgreementOverviewResource extends Resource
     {
         return [
             'index' => Pages\ListAgreementOverviews::route('/'),
-            'create' => Pages\CreateAgreementOverview::route('/create'),
             'view' => Pages\ViewAgreementOverview::route('/{record}'),
-            'edit' => Pages\EditAgreementOverview::route('/{record}/edit'),
         ];
     }
 }

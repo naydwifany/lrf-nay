@@ -1,8 +1,23 @@
 {{-- resources/views/filament/components/workflow-progress.blade.php --}}
+@php
+    $workflowService = $workflowService ?? app(\App\Services\DocumentWorkflowService::class);
+    $progress = $workflowService->getAgreementOverviewProgress($record);
+    $current_status = $record->status;
+@endphp
+
+@style([
+    'width' => $progress.'%',
+])
+
 <div class="space-y-4">
+
+    <div>
+        {{-- Render progress bar dsb --}}
+        {{ $current_status }}
+    </div>
     <!-- Progress Bar -->
     <div class="w-full bg-gray-200 rounded-full h-2">
-        <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: {{ $progress }}%"></div>
+        <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" @style(['width' => $progress.'%'])></div>
     </div>
     
     <!-- Progress Percentage -->

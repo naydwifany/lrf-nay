@@ -18,6 +18,7 @@ class ViewPendingAgreementOverview extends ViewRecord
     {
         $workflowService = app(DocumentWorkflowService::class);
         $canApprove = $workflowService->canUserApproveAgreementOverview(auth()->user(), $this->record);
+        $user = auth()->user();
 
         return [
             Actions\Action::make('approve')
@@ -55,7 +56,10 @@ class ViewPendingAgreementOverview extends ViewRecord
                 ->label('Reject')
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
-                ->visible($canApprove)
+                ->visible(function () use ($user, $canApprove) {
+                    // Exclude director1 & director2 from seeing the Reject button
+                    return $canApprove && ! in_array($user->role, ['director1', 'director2']);
+                })
                 ->requiresConfirmation()
                 ->modalHeading('Reject Agreement Overview')
                 ->modalDescription('Please provide a reason for rejecting this agreement overview.')
@@ -87,7 +91,10 @@ class ViewPendingAgreementOverview extends ViewRecord
                 ->label('Send to Re-discussion')
                 ->icon('heroicon-o-chat-bubble-left-right')
                 ->color('warning')
-                ->visible($canApprove)
+                ->visible(function () use ($user, $canApprove) {
+                    // Only director1 & director2 can see the re-discussion button
+                    return $canApprove && in_array($user->role, ['director1', 'director2']);
+                })
                 ->requiresConfirmation()
                 ->modalHeading('Send to Re-discussion')
                 ->modalDescription('This will send the agreement overview back for further discussion.')

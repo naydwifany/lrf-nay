@@ -35,6 +35,12 @@ class MyAgreementOverviewResource extends Resource
             ->where('nik', auth()->user()->nik);
     }
 
+    protected static function getTableQuery(): Builder
+    {
+        return parent::getTableQuery()
+            ->where('creator_nik', auth()->user()->nik);
+    }
+
     public static function form(Form $form): Form
     {
         return $form

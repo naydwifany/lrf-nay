@@ -54,6 +54,9 @@ class AgreementOverview extends Model
         'completed_at' => 'datetime',
     ];
 
+    protected $with = ['selectedDirector', 'creator', 'lrfDocument', 'approvals'];
+
+
     // Status constants
     const STATUS_DRAFT = 'draft';
     const STATUS_PENDING_HEAD = 'pending_head';
@@ -129,6 +132,20 @@ class AgreementOverview extends Model
     public function documentRequest(): BelongsTo
     {
         return $this->belongsTo(DocumentRequest::class);
+    }
+
+    public function lrfDocument(): BelongsTo
+    {
+        return $this->belongsTo(DocumentRequest::class, 'document_request_id');
+    }
+
+    public function selectedDirector(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'nik_direksi', 'nik');
+    }
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'nik', 'nik');
     }
 
     public function approvals(): HasMany
