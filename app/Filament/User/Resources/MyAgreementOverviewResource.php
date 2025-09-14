@@ -17,6 +17,7 @@ use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Support\Enums\FontWeight;
 
 class MyAgreementOverviewResource extends Resource
 {
@@ -403,7 +404,10 @@ class MyAgreementOverviewResource extends Resource
                         Infolists\Components\TextEntry::make('documentRequest.doctype.document_name')
                             ->label('Document Type')
                             ->badge(),
-                    ])->columns(3),
+                        Infolists\Components\TextEntry::make('lama_perjanjian_surat')
+                            ->label('Agreement Duration')
+                            ->placeholder('Not specified'),
+                    ])->columns(2),
 
                 Infolists\Components\Section::make('Directors & Agreement Period')
                     ->schema([
@@ -445,6 +449,75 @@ class MyAgreementOverviewResource extends Resource
                             ->label('Terms and Mechanisms')
                             ->html()
                             ->columnSpanFull(),
+                    ]),
+
+               Infolists\Components\Section::make('📎 Document Attachments')
+                    ->schema([
+                        Infolists\Components\Grid::make(2)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('documentRequest.dokumen_utama')
+                                    ->label('📄 Main Document')
+                                    ->formatStateUsing(function($state) {
+                                        if (!$state) return '❌ Not uploaded';
+                                        $filename = basename($state);
+                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                        return "📁 {$filename} ({$extension})";
+                                    })
+                                    ->url(fn ($record) => $record->documentRequest?->dokumen_utama ? asset('storage/' . $record->documentRequest->dokumen_utama) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'danger')
+                                    ->weight(FontWeight::Medium),
+
+                                Infolists\Components\TextEntry::make('documentRequest.akta_pendirian')
+                                    ->label('🏢 Akta Pendirian')
+                                    ->formatStateUsing(fn($state) => $state
+                                        ? "📁 " . basename($state) . " (" . strtoupper(pathinfo($state, PATHINFO_EXTENSION)) . ")"
+                                        : "➖ Not provided"
+                                    )
+                                    ->url(fn ($record) => $record->documentRequest?->akta_pendirian ? asset('storage/' . $record->documentRequest->akta_pendirian) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                
+                                Infolists\Components\TextEntry::make('documentRequest.ktp_direktur')
+                                    ->label('🆔 Director ID Card')
+                                    ->formatStateUsing(fn($state) => $state
+                                        ? "📁 " . basename($state) . " (" . strtoupper(pathinfo($state, PATHINFO_EXTENSION)) . ")"
+                                        : "➖ Not provided"
+                                    )
+                                    ->url(fn ($record) => $record->documentRequest?->ktp_direktur ? asset('storage/' . $record->documentRequest?->ktp_direktur) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                
+                                Infolists\Components\TextEntry::make('documentRequest.akta_perubahan')
+                                    ->label('📋 Akta Perubahan')
+                                    ->formatStateUsing(fn($state) => $state
+                                        ? "📁 " . basename($state) . " (" . strtoupper(pathinfo($state, PATHINFO_EXTENSION)) . ")"
+                                        : "➖ Not provided"
+                                    )
+                                    ->url(fn ($record) => $record->documentRequest?->akta_perubahan ? asset('storage/' . $record->documentRequest?->akta_perubahan) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                
+                                Infolists\Components\TextEntry::make('documentRequest.surat_kuasa')
+                                    ->label('✍️ Surat Kuasa')
+                                    ->formatStateUsing(fn($state) => $state
+                                        ? "📁 " . basename($state) . " (" . strtoupper(pathinfo($state, PATHINFO_EXTENSION)) . ")"
+                                        : "➖ Not provided"
+                                    )
+                                    ->url(fn ($record) => $record->documentRequest?->surat_kuasa ? asset('storage/' . $record->documentRequest?->surat_kuasa) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                
+                                Infolists\Components\TextEntry::make('documentRequest.nib')
+                                    ->label('🏪 NIB')
+                                    ->formatStateUsing(fn($state) => $state
+                                        ? "📁 " . basename($state) . " (" . strtoupper(pathinfo($state, PATHINFO_EXTENSION)) . ")"
+                                        : "➖ Not provided"
+                                    )
+                                    ->url(fn ($record) => $record->documentRequest?->nib ? asset('storage/' . $record->documentRequest?->nib) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                            ]),
                     ]),
 
                 // Show approval status if not draft

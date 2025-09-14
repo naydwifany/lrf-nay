@@ -34,9 +34,8 @@ class CreateMyAgreementOverview extends CreateRecord
         $data['director1_name'] = $director1['name'];
 
         // Fill director2_name if director2_nik is selected
-        if (!empty($data['director2_nik']) && empty($data['director2_name'])) {
+        if (!empty($data['director2_nik'])) {
             $director2 = static::getDirector2Details($data['director2_nik']);
-
             $data['director2_name'] = $director2['name'];
         }
 
@@ -118,6 +117,24 @@ class CreateMyAgreementOverview extends CreateRecord
                 'title' => 'Direktur Utama',
                 'direktorat' => 'Executive'
             ],
+            'MARKETING' => [
+                'nik' => '1201008',
+                'name' => 'Michael Iskandar',
+                'title' => 'Merchandising & Marketing Director',
+                'direktorat' => 'Marketing'
+            ],
+            'SALES & LOGISTIC' => [
+                'nik' => '16010005',
+                'name' => 'FA Tri Agus Winarko HS',
+                'title' => 'Retail Sales & Logistic Director',
+                'direktorat' => 'Sales & Logistic'
+            ],
+            'WHOLESALES' => [
+                'nik' => '20050036',
+                'name' => 'Lenny Susilawaty Jamadi',
+                'title' => 'Wholesales Director',
+                'direktorat' => 'Wholesales'
+            ],
         ];
 
         return $directorMapping[strtoupper($direktorat)] ?? $directorMapping['IT'];
@@ -125,31 +142,21 @@ class CreateMyAgreementOverview extends CreateRecord
 
     public static function getDirector2Details($director2Selection): array
     {
-        $directors = [
-            '14070619' => [
-                'nik' => '14070619',
-                'name' => 'Wiradi - FA IT Director',
-                'title' => 'Finance & Admin IT Director',
-                'direktorat' => 'IT'
-            ],
-            '710144' => [
-                'nik' => '710144',
-                'name' => 'Lyvia Mariana - Direktur Utama',
-                'title' => 'Direktur Utama',
-                'direktorat' => 'Executive'
-            ],
-            '20050037' => [
-                'nik' => '20050037',
-                'name' => 'Widi Satya Chitra - Corporate Secretary, Legal & Business Development Director',
-                'title' => 'Corporate Secretary, Legal & Business Development Director',
-                'direktorat' => 'Legal'
-            ],
-        ];
+        $user = \App\Models\User::where('nik', $director2Selection)->first();
 
-        return $directors[$director2Selection] ?? [
+        if ($user) {
+            return [
+                'nik' => $user->nik,
+                'name' => $user->name,
+                'jabatan' => $user->jabatan ?? 'Unknown Title',
+                'direktorat' => $user->direktorat ?? 'Unknown'
+            ];
+        }
+
+        return [
             'nik' => 'DIR_UNKNOWN',
-            'name' => 'Unknown Director',
-            'title' => 'Unknown Title',
+            'name' => 'Unknown Director - Selection: ' . $director2Selection,
+            'jabatan' => 'Unknown Title',
             'direktorat' => 'Unknown'
         ];
     }

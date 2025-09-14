@@ -15,7 +15,8 @@ class ListMyDocumentRequests extends ListRecords
     {
         return [
             Actions\CreateAction::make()
-                ->label('Create New Document Request'),
+                ->label('Create New Document Request')
+                ->visible(fn () => ! in_array(auth()->user()->role, ['supervisor', 'senior_manager']))
         ];
     }
 }

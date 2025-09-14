@@ -10,10 +10,12 @@ class ListDocumentRequests extends ListRecords
 {
     protected static string $resource = DocumentRequestResource::class;
 
+    /*
     protected function getHeaderActions(): array
     {
         return [
             Actions\CreateAction::make(),
         ];
     }
+    */
 }

@@ -11,6 +11,7 @@ class ListAgreementOverviews extends ListRecords
 {
     protected static string $resource = AgreementOverviewResource::class;
 
+    /*
     protected function getHeaderActions(): array
     {
         return [
@@ -19,4 +20,5 @@ class ListAgreementOverviews extends ListRecords
                 ->icon('heroicon-o-plus'),
         ];
     }
+    */
 }

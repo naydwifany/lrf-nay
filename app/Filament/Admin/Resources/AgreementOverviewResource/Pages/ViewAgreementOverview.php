@@ -25,6 +25,7 @@ class ViewAgreementOverview extends ViewRecord
             Actions\EditAction::make()
                 ->visible(fn() => $this->record->is_draft),
 
+            /* approve/reject/send to rediscussion buttons move to below at infolist in AgreementOverviewResource.php
             Actions\Action::make('approve')
                 ->label('Approve')
                 ->icon('heroicon-o-check-circle')
@@ -133,6 +134,7 @@ class ViewAgreementOverview extends ViewRecord
                         ->rows(3)
                         ->helperText('Optional: Add your comments for this rediscussion'),
                 ]),
+            */
                 
             Actions\Action::make('submit_for_approval')
                 ->label('Submit for Approval')

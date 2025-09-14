@@ -199,11 +199,7 @@ class DocumentDiscussionService
         }
     }
 
-    public function closeDiscussion(
-        DocumentRequest $documentRequest, 
-        User $user, 
-        string $reason = null
-    ): DocumentComment {
+    public function closeDiscussion(DocumentRequest $documentRequest, User $user, string $reason = null): DocumentComment {
         if ($user->role !== 'head_legal') {
             throw new \Exception('Only Head Legal can close the discussion.');
         }
@@ -493,7 +489,7 @@ class DocumentDiscussionService
             'supervisor',
             'head',
             'reviewer_legal',
-            'admin_legal',
+            'head_finance',
             'finance',
         ];
 
@@ -528,7 +524,7 @@ class DocumentDiscussionService
             }
             
             // 5. Role-based access for privileged users
-            $privilegedRoles = ['head_legal', 'reviewer_legal', 'admin_legal', 'general_manager'];
+            $privilegedRoles = ['head_legal', 'reviewer_legal', 'general_manager'];
             if (in_array($user->role, $privilegedRoles)) {
                 return true;
             }
@@ -586,7 +582,7 @@ class DocumentDiscussionService
         // Get all users who have access to this discussion
         $users = User::whereIn('role', [
             'head_legal', 'general_manager', 'head', 
-            'reviewer_legal', 'finance', 'admin_legal'
+            'reviewer_legal', 'finance'
         ])->where('nik', '!=', $commenter->nik)->get();
 
         foreach ($users as $user) {

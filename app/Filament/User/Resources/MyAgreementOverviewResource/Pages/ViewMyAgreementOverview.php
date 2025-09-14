@@ -8,6 +8,7 @@ use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Notifications\Notification;
 use Filament\Forms;
+use App\Services\DocumentWorkflowService;
 
 class ViewMyAgreementOverview extends ViewRecord
 {
@@ -15,6 +16,9 @@ class ViewMyAgreementOverview extends ViewRecord
 
     protected function getHeaderActions(): array
     {
+        $workflowService = app(DocumentWorkflowService::class);
+        $canApprove = $workflowService->canUserApproveAgreementOverview(auth()->user(), $this->record);
+
         return [
             // Edit Action
             Actions\EditAction::make()
@@ -91,7 +95,7 @@ class ViewMyAgreementOverview extends ViewRecord
                 ->requiresConfirmation()
                 ->modalHeading('Approve Agreement Overview')
                 ->modalDescription('Are you sure you want to approve this agreement overview?')
-                ->visible(fn($record) => $this->canUserApprove($record))
+                ->visible($canApprove)
                 ->action(function ($record, array $data) {
                     $this->processApproval($record, 'approved', $data['approval_comments'] ?? '');
                 }),
@@ -111,7 +115,7 @@ class ViewMyAgreementOverview extends ViewRecord
                 ->requiresConfirmation()
                 ->modalHeading('Reject Agreement Overview')
                 ->modalDescription('Please provide a reason for rejection.')
-                ->visible(fn($record) => $this->canUserApprove($record))
+                ->visible($canApprove)
                 ->action(function ($record, array $data) {
                     $this->processApproval($record, 'rejected', $data['rejection_reason']);
                 }),

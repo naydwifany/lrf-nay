@@ -147,6 +147,7 @@ class PendingAgreementOverviewResource extends Resource
                     ->since()
                     ->tooltip(fn ($record) => $record->submitted_at?->format('d M Y H:i:s')),
                 
+                /*
                 Tables\Columns\TextColumn::make('priority_indicator')
                     ->label('Priority')
                     ->getStateUsing(function ($record) {
@@ -162,6 +163,7 @@ class PendingAgreementOverviewResource extends Resource
                         'Normal' => 'success',
                         default => 'gray',
                     }),
+                */
                 
                 Tables\Columns\TextColumn::make('selectedDirector.name')
                     ->label('Selected Director')
@@ -193,7 +195,8 @@ class PendingAgreementOverviewResource extends Resource
                         
                         return $relevantStatuses;
                     }),
-                
+
+                /*
                 SelectFilter::make('priority')
                     ->options([
                         'high' => 'High Priority (>3 days)',
@@ -212,6 +215,7 @@ class PendingAgreementOverviewResource extends Resource
                             }
                         });
                     }),
+                */
                 
                 SelectFilter::make('divisi')
                     ->label('Division')
@@ -234,6 +238,7 @@ class PendingAgreementOverviewResource extends Resource
                 Tables\Actions\ViewAction::make()
                     ->slideOver(),
                 
+                /* approve/reject buttons moved to infolist below
                 Tables\Actions\Action::make('approve')
                     ->label('Approve')
                     ->icon('heroicon-o-check-circle')
@@ -336,7 +341,7 @@ class PendingAgreementOverviewResource extends Resource
                             ->send();
                     }),
                     
-                /*
+                
                 Tables\Actions\Action::make('detailed_review')
                     ->label('Detailed Review')
                     ->icon('heroicon-o-document-magnifying-glass')
@@ -404,8 +409,9 @@ class PendingAgreementOverviewResource extends Resource
                             ->send();
                     }),
                     */
-            ])  
+            ]);
 
+            /* no bulk action allowed (said by client)
             ->bulkActions([
                 Tables\Actions\BulkAction::make('bulk_approve')
                     ->label('Bulk Approve Selected')
@@ -437,6 +443,7 @@ class PendingAgreementOverviewResource extends Resource
             ->emptyStateHeading('No Pending Agreement Overviews')
             ->emptyStateDescription('There are no agreement overviews waiting for your approval.')
             ->emptyStateIcon('heroicon-o-clock');
+        */
     }
 
     public static function infolist(Infolist $infolist): Infolist
@@ -553,6 +560,84 @@ class PendingAgreementOverviewResource extends Resource
                             ->visible(fn($record) => !$record->is_draft),
                     ])
                     ->columns(2),
+                
+                // Enhanced Action Buttons
+                Infolists\Components\Section::make('🎯 Approval Actions')
+                    ->description('Review the Agreement Overview carefully and make your decision')
+                    ->schema([
+                        Infolists\Components\Actions::make([
+                            Infolists\Components\Actions\Action::make('approve')
+                                ->label('✅ Approve Document')
+                                ->icon('heroicon-o-check-circle')
+                                ->color('success')
+                                ->size('lg')
+                                ->visible(fn (AgreementOverview $record) =>
+                                    app(DocumentWorkflowService::class)
+                                        ->canUserApproveAgreementOverview(auth()->user(), $record)
+                                )
+                                ->form([
+                                    Forms\Components\Textarea::make('approval_comments')
+                                        ->label('Approval Comments')
+                                        ->rows(3)
+                                        ->helperText('Optional: Add your comments for this approval'),
+                                ])
+                                ->action(function (AgreementOverview $record, array $data) {
+                                    $workflowService = app(DocumentWorkflowService::class);
+
+                                    $workflowService->approveAgreementOverview(
+                                        $record,
+                                        auth()->user(),
+                                        $data['approval_comments'] ?? 'Approved'
+                                    );
+
+                                    Notification::make()
+                                        ->title('Agreement Overview Approved')
+                                        ->body('The Agreement Overview has been successfully approved.')
+                                        ->success()
+                                        ->send();
+                                })
+                                ->requiresConfirmation()
+                                ->modalHeading('✅ Approve Agreement Overview')
+                                ->modalDescription('Are you sure you want to approve this Agreement Overview?'),
+
+                            Infolists\Components\Actions\Action::make('reject')
+                                ->label('❌ Reject Document')
+                                ->icon('heroicon-o-x-circle')
+                                ->color('danger')
+                                ->size('lg')
+                                ->modalHeading('Reject Agreement Overview')
+                                ->modalDescription('Are you sure you want to reject this Agreement Overview?')
+                                ->modalSubmitActionLabel('Reject')
+                                ->visible(fn (AgreementOverview $record) =>
+                                    auth()->user()->role === 'director' &&
+                                    app(DocumentWorkflowService::class)
+                                        ->canUserApproveAgreementOverview(auth()->user(), $record)
+                                )
+                                ->action(function (AgreementOverview $record, array $data) {
+                                    $workflowService = app(DocumentWorkflowService::class);
+
+                                    $workflowService->rejectAgreementOverview(
+                                        $record,
+                                        auth()->user(),
+                                        $data['rejection_reason']
+                                    );
+
+                                    Notification::make()
+                                        ->title('Agreement Overview Rejected')
+                                        ->body('The agreement overview has been rejected and returned to the requester.')
+                                        ->danger()
+                                        ->send();
+                                })
+                                ->form([
+                                    Forms\Components\Textarea::make('rejection_reason')
+                                        ->label('Rejection Reason')
+                                        ->required()
+                                        ->rows(3)
+                                        ->helperText('Please provide a clear reason for rejection'),
+                                ])
+                                ->requiresConfirmation(),
+                        ])->columnSpanFull(),
+                    ]),
             ]);
     }
 

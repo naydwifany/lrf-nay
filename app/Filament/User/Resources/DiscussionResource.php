@@ -130,17 +130,21 @@ class DiscussionResource extends Resource
                 Tables\Columns\TextColumn::make('finance_status')
                     ->label('Finance')
                     ->getStateUsing(function ($record) {
+                        // cek apakah ada comment finance yang belum closed
                         $hasFinance = $record->comments()
                             ->where('user_role', 'finance')
                             ->where('is_forum_closed', false)
                             ->exists();
-                        return $hasFinance ? 'Participated' : 'Pending';
+
+                        // Kalau ada, berarti already involved, kalau nggak, not yet
+                        return $hasFinance ? 'Already' : 'Not yet';
                     })
                     ->badge()
                     ->color(function (string $state): string {
                         return match ($state) {
-                            'Participated' => 'success',
-                            'Pending' => 'warning',
+                            'Already' => 'success',
+                            'Not Yet' => 'warning',
+                            default => 'gray',
                         };
                     }),
                     

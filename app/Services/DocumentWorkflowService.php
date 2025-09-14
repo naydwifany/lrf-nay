@@ -8,6 +8,8 @@ use App\Models\DocumentRequest;
 use App\Models\AgreementOverview;
 use App\Models\DocumentApproval;
 use App\Models\User;
+use App\Models\Notification;
+use App\Jobs\SendEmailNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -41,6 +43,23 @@ class DocumentWorkflowService
 
             DB::commit();
             Log::info("Document {$document->id} submitted - Supervisor approval created");
+
+            // 🔔 Kirim notifikasi ke creator
+            $notification = Notification::create([
+                'recipient_nik' => $user->nik,
+                'recipient_name' => $user->name,
+                'sender_nik' => $user->nik,
+                'sender_name' => $user->name,
+                'title' => 'Document Submitted',
+                'message' => "Your document '{$document->title}' has been submitted and is waiting for Supervisor approval.",
+                'type' => Notification::TYPE_APPROVAL_REQUEST,
+                'related_type' => DocumentRequest::class,
+                'related_id' => $document->id,
+            ]);
+
+            // 🚀 Dispatch email job
+            SendEmailNotification::dispatchSync($notification);
+
             return true;
 
         } catch (\Exception $e) {
@@ -358,7 +377,7 @@ class DocumentWorkflowService
                 
             DocumentRequest::STATUS_PENDING_LEGAL_ADMIN => 
                 // Legal team
-                in_array($user->role, ['admin_legal', 'legal_admin', 'head_legal', 'legal']),
+                in_array($user->role, ['admin_legal', 'legal_admin']),
                 
             default => false
         };
@@ -1052,12 +1071,12 @@ private function getUserRoleFromApprover(User $approver): string
     /**
      * Create approval record for Agreement Overview
      */
-    private function createAgreementApprovalRecord(\App\Models\AgreementOverview $agreementOverview, string $approvalType, ?string $previousApprovalType = null): void
+    private function createAgreementApprovalRecord(AgreementOverview $agreementOverview, string $approvalType): void
     {
         // Get approver based on approval type
-        $approver = $this->getAgreementApprover($agreementOverview, $approvalType);
+        $approvers = $this->getAgreementApprovers($agreementOverview, $approvalType);
         
-        if (!$approver) {
+        if (!$approvers) {
             Log::warning('No approver found for approval type', [
                 'approval_type' => $approvalType,
                 'ao_id' => $agreementOverview->id
@@ -1065,35 +1084,41 @@ private function getUserRoleFromApprover(User $approver): string
             return;
         }
 
-        // Map to actual approval type constants from model
         $actualApprovalType = $this->mapToActualApprovalType($approvalType);
-        
-        \App\Models\AgreementApproval::create([
-            'agreement_overview_id' => $agreementOverview->id,
-            'approver_nik' => $approver->nik,
-            'approver_name' => $approver->name,
-            'approval_type' => $actualApprovalType,
-            'division_level' => $this->getApprovalDivisionLevel($approvalType),
-            'is_division_approval' => $this->isDivisionApprovalType($actualApprovalType),
-            'status' => \App\Models\AgreementApproval::STATUS_PENDING,
-            'order' => $this->getApprovalOrder($actualApprovalType, $agreementOverview->id),
-        ]);
 
-        Log::info('Created approval record', [
-            'ao_id' => $agreementOverview->id,
-            'approval_type' => $actualApprovalType,
-            'approver_nik' => $approver->nik,
-            'approver_name' => $approver->name
-        ]);
+foreach ($approvers as $approver) {
+    $actualApprovalType = match ($approvalType) {
+        'head' => $approver->role === 'senior_manager'
+                    ? \App\Models\AgreementApproval::TYPE_DIVISION_SENIOR_MANAGER
+                    : \App\Models\AgreementApproval::TYPE_DIVISION_MANAGER,
+        default => $this->mapToActualApprovalType($approvalType),
+    };
+
+            \App\Models\AgreementApproval::firstOrCreate([
+                'agreement_overview_id' => $agreementOverview->id,
+                'approver_nik'          => $approver->nik,
+                'approval_type'         => $actualApprovalType,
+            ], [
+                'approver_name'         => $approver->name,
+                'division_level'        => $this->getApprovalDivisionLevel($approvalType),
+                'is_division_approval'  => $this->isDivisionApprovalType($approvalType),
+                'status'                => \App\Models\AgreementApproval::STATUS_PENDING,
+                'order'                 => $this->getApprovalOrder($actualApprovalType, $agreementOverview->id),
+            ]);
+        }
     }
 
     /**
      * Map simplified approval type to actual model constants
      */
-    private function mapToActualApprovalType(string $simpleType): string
+    private function mapToActualApprovalType(string $simpleType, string $role): string
     {
         return match ($simpleType) {
-            'head'           => \App\Models\AgreementApproval::TYPE_MANAGER, // bisa manager / senior_manager
+            'head' => match($role) {
+                'manager'        => \App\Models\AgreementApproval::TYPE_DIVISION_MANAGER,
+                'senior_manager' => \App\Models\AgreementApproval::TYPE_DIVISION_SENIOR_MANAGER,
+                default          => \App\Models\AgreementApproval::TYPE_DIVISION_MANAGER,
+            },
             'senior_manager' => \App\Models\AgreementApproval::TYPE_SENIOR_MANAGER,
             'general_manager'=> \App\Models\AgreementApproval::TYPE_GENERAL_MANAGER,
             'finance'        => \App\Models\AgreementApproval::TYPE_HEAD_FINANCE,
@@ -1107,19 +1132,19 @@ private function getUserRoleFromApprover(User $approver): string
     /**
      * Get approver user based on approval type and AO
      */
-    private function getAgreementApprover(\App\Models\AgreementOverview $agreementOverview, string $approvalType): ?User
+    private function getAgreementApprovers(\App\Models\AgreementOverview $agreementOverview, string $approvalType): ?User
     {
         return match ($approvalType) {
-            'head' => User::where('role', 'head')
-                         ->where('divisi', $agreementOverview->divisi)
-                         ->first(),
+            'head' => User::whereIn('role', ['head', 'manager', 'senior_manager'])
+                        ->when($approvalType === 'head', fn($q) => $q->where('divisi', $agreementOverview->divisi))
+                        ->get(),
             'general_manager' => User::where('role', 'general_manager')->first(),
             'finance' => User::whereIn('role', ['finance', 'head_finance'])->first(),
             'legal_admin' => User::whereIn('role', ['legal', 'head_legal'])->first(),
             'director1' => User::where('nik', $agreementOverview->nik_direksi)->first(),
-            'director2' => User::where('role', 'director')
+            'director2' => User::whereIn('role', 'director')
                               ->where('nik', '!=', $agreementOverview->nik_direksi)
-                              ->first(),
+                              ->get(),
             default => null
         };
     }
@@ -1190,28 +1215,28 @@ private function getUserRoleFromApprover(User $approver): string
     /**
      * Get next status in Agreement Overview workflow
      */
-    private function getNextAgreementOverviewStatus(string $currentStatus, \App\Models\AgreementOverview $ao): string
+    private function getNextAgreementOverviewStatus(string $currentStatus, AgreementOverview $ao): string
     {
         // Jika Senior Manager sudah approve → langsung ke Finance
-        if ($currentStatus === \App\Models\AgreementOverview::STATUS_PENDING_HEAD) {
+        if ($currentStatus === AgreementOverview::STATUS_PENDING_HEAD) {
             $approvedTypes = \App\Models\AgreementApproval::where('agreement_overview_id', $ao->id)
                 ->where('status', \App\Models\AgreementApproval::STATUS_APPROVED)
                 ->pluck('approval_type')
                 ->toArray();
 
             if (in_array(\App\Models\AgreementApproval::TYPE_SENIOR_MANAGER, $approvedTypes)) {
-                return \App\Models\AgreementOverview::STATUS_PENDING_FINANCE;
+                return AgreementOverview::STATUS_PENDING_FINANCE;
             }
 
-            return \App\Models\AgreementOverview::STATUS_PENDING_GM;
+            return AgreementOverview::STATUS_PENDING_GM;
         }
 
         return match ($currentStatus) {
-            \App\Models\AgreementOverview::STATUS_PENDING_GM => \App\Models\AgreementOverview::STATUS_PENDING_FINANCE,
-            \App\Models\AgreementOverview::STATUS_PENDING_FINANCE => \App\Models\AgreementOverview::STATUS_PENDING_LEGAL,
-            \App\Models\AgreementOverview::STATUS_PENDING_LEGAL => \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR1,
-            \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR1 => \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR2,
-            \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR2 => \App\Models\AgreementOverview::STATUS_APPROVED,
+            AgreementOverview::STATUS_PENDING_GM => AgreementOverview::STATUS_PENDING_FINANCE,
+            AgreementOverview::STATUS_PENDING_FINANCE => AgreementOverview::STATUS_PENDING_LEGAL,
+            AgreementOverview::STATUS_PENDING_LEGAL => AgreementOverview::STATUS_PENDING_DIRECTOR1,
+            AgreementOverview::STATUS_PENDING_DIRECTOR1 => AgreementOverview::STATUS_PENDING_DIRECTOR2,
+            AgreementOverview::STATUS_PENDING_DIRECTOR2 => AgreementOverview::STATUS_APPROVED,
             default => $currentStatus
         };
     }
@@ -1269,7 +1294,7 @@ private function getUserRoleFromApprover(User $approver): string
             'final_result'    => $pendingApproval !== null && $rolePermission,
         ]);
 
-        return $pendingApproval !== null && $rolePermission && $isCreator === false;
+        return $rolePermission && $isCreator === false;;
     }
 
     /**
@@ -1291,4 +1316,17 @@ private function getUserRoleFromApprover(User $approver): string
             default => 0
         };
     }
+
+    // Get current document status considering latest AO status
+    public function getDocumentStatus(DocumentRequest $documentRequest): string
+    {
+        $ao = $documentRequest->agreementOverview()->latest()->first();
+
+        if ($ao) {
+            return $ao->status;
+        }
+
+        return $documentRequest->status;
+    }
+
 }

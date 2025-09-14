@@ -38,7 +38,6 @@ class UserPanelProvider extends PanelProvider
             ->brandName('Document Flow - User Portal')
             ->favicon(asset('images/favicon.ico'))
             ->discoverResources(in: app_path('Filament/User/Resources'), for: 'App\\Filament\\User\\Resources')
-            ->discoverPages(in: app_path('Filament/User/Pages'), for: 'App\\Filament\\User\\Pages')
             ->pages([
                 Pages\Dashboard::class, //tambahan cek disini
             ])

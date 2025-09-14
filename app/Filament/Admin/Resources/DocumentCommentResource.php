@@ -21,7 +21,7 @@ class DocumentCommentResource extends Resource
 {
     protected static ?string $model = DocumentComment::class;
     protected static ?string $navigationIcon = 'heroicon-o-chat-bubble-left-right';
-    protected static ?string $navigationLabel = 'Discussion Comments';
+    /* protected static ?string $navigationLabel = 'Discussion Comments'; */
     protected static ?string $navigationGroup = 'Document Management';
     protected static ?int $navigationSort = 3;
 

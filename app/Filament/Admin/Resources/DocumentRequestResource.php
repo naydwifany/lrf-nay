@@ -7,6 +7,7 @@ use App\Filament\Admin\Resources\DocumentRequestResource\Pages;
 use App\Models\DocumentRequest;
 use App\Models\DocumentApproval;
 use App\Services\DocumentWorkflowService;
+use App\Services\DocumentRequestService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -78,6 +79,7 @@ class DocumentRequestResource extends Resource
                                                 ->required()
                                                 ->label('Document Type')
                                                 ->placeholder('Select document type'),
+                                            /* priority field is unnecessary
                                             Forms\Components\Select::make('priority')
                                                 ->options([
                                                     'low' => 'Low',
@@ -89,6 +91,7 @@ class DocumentRequestResource extends Resource
                                                 ->required()
                                                 ->native(false)
                                                 ->label('Priority Level'),
+                                            */
                                             Forms\Components\Select::make('doc_filter')
                                                 ->label('Document Action')
                                                 ->options([
@@ -162,6 +165,7 @@ class DocumentRequestResource extends Resource
                     Forms\Components\Wizard\Step::make('Business Requirements')
                         ->icon('heroicon-o-briefcase')
                         ->schema([
+                            /*
                             Forms\Components\Section::make('📋 Business Justification')
                                 ->schema([
                                     Forms\Components\RichEditor::make('data')
@@ -187,6 +191,7 @@ class DocumentRequestResource extends Resource
                                                 ->helperText('Helps prioritize and plan the workflow'),
                                         ]),
                                 ]),
+                            */
                         ]),
 
                     Forms\Components\Wizard\Step::make('Terms & Conditions')
@@ -304,7 +309,7 @@ class DocumentRequestResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('nomor_dokumen')
-                    ->label('Doc No.')
+                    ->label('Doc Number')
                     ->searchable()
                     ->sortable()
                     ->placeholder('Pending')
@@ -314,7 +319,6 @@ class DocumentRequestResource extends Resource
                     ->weight(FontWeight::Bold),
                 
                 Tables\Columns\TextColumn::make('title')
-                    ->label('Document Title')
                     ->searchable()
                     ->sortable()
                     ->limit(40)
@@ -338,27 +342,71 @@ class DocumentRequestResource extends Resource
                     ->size('sm'),
                 
                 Tables\Columns\TextColumn::make('doctype.document_name')
-                    ->label('Type')
+                    ->label('Doc Type')
                     ->badge()
                     ->color('primary')
                     ->size('sm'),
-                
-                Tables\Columns\BadgeColumn::make('status')
-                    ->colors([
-                        'secondary' => 'draft',
-                        'warning' => 'pending_supervisor',
-                        'info' => 'pending_gm',
-                        'primary' => 'pending_legal_admin',
-                        'purple' => 'in_discussion',
-                        'success' => 'agreement_creation',  // Hijau untuk siap create AO
-                        'danger' => 'rejected',
-                    ])
-                    ->formatStateUsing(fn($state) => match($state) {
-                        'in_discussion' => 'In Discussion',
-                        'agreement_creation' => 'Ready for AO',  // Lebih jelas
-                        default => str_replace('_', ' ', ucwords($state))
+
+                Tables\Columns\BadgeColumn::make('decision')
+                    ->label('Your Decision')
+                    ->getStateUsing(function ($record) {
+                        $userNik = auth()->user()->nik;
+
+                        // Ambil approval yang spesifik untuk user login
+                        $approval = $record->approvals->firstWhere('approver_nik', $userNik);
+
+                        if (! $approval) {
+                            return 'You haven\'t been involved yet';
+                        }
+
+                        if (is_null($approval->status) || $approval->status === 'pending') {
+                            return 'Your Turn';
+                        }
+
+                        return $approval->status; // 'approved' / 'rejected'
                     }),
                 
+                Tables\Columns\BadgeColumn::make('computed_status')
+                    ->label('Status')
+                    ->colors([
+                        'warning' => 'pending_supervisor',
+                        'info'    => ['pending_gm', 'in_discussion'],
+                        'primary' => ['pending_legal', 'pending_legal_admin'],
+                        'gray'    => 'submitted',
+
+                        // AO stages
+                        'purple'  => \App\Models\AgreementOverview::STATUS_PENDING_HEAD,
+                        'success' => ['agreement_creation', 'completed'],
+                        'danger'  => \App\Models\AgreementOverview::STATUS_REJECTED,
+                    ])
+                    ->formatStateUsing(function ($state, $record) {
+                        // sekarang $state sudah computed_status (bisa AO / docreq)
+                        return match ($state) {
+                            \App\Models\AgreementOverview::STATUS_DRAFT             => 'AO Draft',
+                            \App\Models\AgreementOverview::STATUS_PENDING_HEAD      => 'AO - Pending Head',
+                            \App\Models\AgreementOverview::STATUS_PENDING_GM        => 'AO - Pending GM',
+                            \App\Models\AgreementOverview::STATUS_PENDING_FINANCE   => 'AO - Pending Finance',
+                            \App\Models\AgreementOverview::STATUS_PENDING_LEGAL     => 'AO - Pending Legal',
+                            \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR1 => 'AO - Pending Director 1',
+                            \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR2 => 'AO - Pending Director 2',
+                            \App\Models\AgreementOverview::STATUS_APPROVED          => 'AO Approved',
+                            \App\Models\AgreementOverview::STATUS_REJECTED          => 'AO Rejected',
+                            \App\Models\AgreementOverview::STATUS_REDISCUSS         => 'AO Back to Discussion',
+
+                            'pending_supervisor'   => 'Pending Supervisor',
+                            'pending_gm'           => 'Pending GM',
+                            'pending_legal_admin'  => 'Pending Admin Legal',
+                            'pending_legal'        => 'Pending Legal',
+                            'in_discussion'        => 'On Discussion Forum',
+                            'agreement_creation'   => 'Ready for AO',
+                            'completed'            => 'Agreement Successful',
+                            'approved'             => 'Approved',
+                            'rejected'             => 'Rejected',
+                            default                => 'You haven\'t been involved yet',
+                        };
+                    }),
+                
+                /* priority field is unnecessary
                 Tables\Columns\BadgeColumn::make('priority')
                     ->colors([
                         'success' => 'low',
@@ -367,17 +415,36 @@ class DocumentRequestResource extends Resource
                         'danger' => 'urgent',
                     ])
                     ->size('sm'),
-                
+                */
+
                 Tables\Columns\TextColumn::make('submitted_at')
                     ->label('Submitted')
                     ->dateTime('M j, Y')
-                    ->since()
+                    ->dateTime()
                     ->sortable()
-                    ->placeholder('Draft')
                     ->size('sm'),
+
+                Tables\Columns\TextColumn::make('completed_at')
+                    ->label('Completed')
+                    ->sortable()
+                    ->getStateUsing(function ($record) {
+                        // Pakai completed_at kalau ada, kalau null pakai status fallback
+                        return $record->completed_at ?? $record->status;
+                    })
+                    ->formatStateUsing(function ($state) {
+                        if ($state instanceof \Carbon\Carbon) {
+                            return $state->format('d M Y H:i');
+                        }
+
+                        return match ($state) {
+                            'rejected' => 'Rejected',
+                            default => 'Still on Progress',
+                        };
+                    }),
                 
+                /*
                 Tables\Columns\TextColumn::make('days_pending')
-                    ->label('Days')
+                    ->label('Days Pending')
                     ->getStateUsing(fn($record) => $record->submitted_at ? now()->diffInDays($record->submitted_at) : 0)
                     ->badge()
                     ->color(fn($state) => $state > 14 ? 'danger' : ($state > 7 ? 'warning' : 'success'))
@@ -391,21 +458,53 @@ class DocumentRequestResource extends Resource
                     ->trueColor('gray')
                     ->falseColor('success')
                     ->size('sm'),
+                */
             ])
             ->filters([
-                SelectFilter::make('status')
-                    ->options([
-                        'draft' => 'Draft',
-                        'pending_supervisor' => 'Pending Supervisor',
-                        'pending_gm' => 'Pending GM',
-                        'pending_legal_admin' => 'Pending Legal Admin',
-                        'in_discussion' => 'In Discussion',
-                        'approved' => 'Approved',
-                        'rejected' => 'Rejected',
+                Filter::make('computed_status')
+                    ->label('Status')
+                    ->form([
+                        Forms\Components\MultiSelect::make('statuses')
+                            ->label('Select Status')
+                            ->options([
+                                'pending_supervisor'   => 'Pending Supervisor',
+                                'pending_gm'           => 'Pending GM',
+                                'pending_legal_admin'  => 'Pending Admin Legal',
+                                'pending_legal'        => 'Pending Legal',
+                                'in_discussion'        => 'On Discussion Forum',
+                                'agreement_creation'   => 'Ready for AO',
+                                'completed'            => 'Agreement Successful',
+                                'approved'             => 'Approved',
+                                'rejected'             => 'Rejected',
+
+                                // AO stages
+                                \App\Models\AgreementOverview::STATUS_DRAFT             => 'AO Draft',
+                                \App\Models\AgreementOverview::STATUS_PENDING_HEAD      => 'AO - Pending Head',
+                                \App\Models\AgreementOverview::STATUS_PENDING_GM        => 'AO - Pending GM',
+                                \App\Models\AgreementOverview::STATUS_PENDING_FINANCE   => 'AO - Pending Finance',
+                                \App\Models\AgreementOverview::STATUS_PENDING_LEGAL     => 'AO - Pending Legal',
+                                \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR1 => 'AO - Pending Director 1',
+                                \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR2 => 'AO - Pending Director 2',
+                                \App\Models\AgreementOverview::STATUS_APPROVED          => 'AO Approved',
+                                \App\Models\AgreementOverview::STATUS_REJECTED          => 'AO Rejected',
+                                \App\Models\AgreementOverview::STATUS_REDISCUSS         => 'AO Back to Discussion',
+                            ]),
                     ])
-                    ->multiple()
-                    ->preload(),
+                    ->query(function ($query, array $data) {
+                        if (empty($data['statuses'])) {
+                            return;
+                        }
+
+                        $query->where(function ($subQuery) use ($data) {
+                            $subQuery->whereHas('agreementOverview', function ($aoQuery) use ($data) {
+                                $aoQuery->whereIn('status', $data['statuses']);
+                            })->orWhere(function ($docReqQuery) use ($data) {
+                                $docReqQuery->whereIn('status', $data['statuses']);
+                            });
+                        });
+                    }),
                 
+                /* priority field is unnecessary
                 SelectFilter::make('priority')
                     ->options([
                         'low' => 'Low',
@@ -414,14 +513,69 @@ class DocumentRequestResource extends Resource
                         'urgent' => 'Urgent',
                     ])
                     ->multiple(),
-                
+                */
+
+                Filter::make('decision')
+                    ->label('Your Decision')
+                    ->form([
+                        Forms\Components\Select::make('decisions')
+                            ->label('Select a status')
+                            ->options([
+                                'approved'   => 'Approved',
+                                'rejected'   => 'Rejected',
+                                'your_turn'  => 'Your Turn',
+                                'not_involved' => 'You haven\'t been involved yet',
+                            ]),
+                    ])
+                    ->query(function ($query, array $data) {
+                        if (empty($data['decisions'])) {
+                            return;
+                        }
+
+                        $userNik = auth()->user()->nik;
+
+                        $query->where(function ($q) use ($data, $userNik) {
+                            switch ($data['decisions']) {
+                                case 'approved':
+                                    $q->whereHas('approvals', function ($approvalQuery) use ($userNik) {
+                                        $approvalQuery->where('approver_nik', $userNik)
+                                            ->where('status', 'approved');
+                                    });
+                                    break;
+
+                                case 'rejected':
+                                    $q->whereHas('approvals', function ($approvalQuery) use ($userNik) {
+                                        $approvalQuery->where('approver_nik', $userNik)
+                                            ->where('status', 'rejected');
+                                    });
+                                    break;
+
+                                case 'your_turn':
+                                    $q->whereHas('approvals', function ($approvalQuery) use ($userNik) {
+                                        $approvalQuery->where('approver_nik', $userNik)
+                                            ->where(function ($sub) {
+                                                $sub->whereNull('status')
+                                                    ->orWhere('status', 'pending');
+                                            });
+                                    });
+                                    break;
+
+                                case 'not_involved':
+                                    $q->whereDoesntHave('approvals', function ($approvalQuery) use ($userNik) {
+                                        $approvalQuery->where('approver_nik', $userNik);
+                                    });
+                                    break;
+                            }
+                        });
+                    }),
+
                 SelectFilter::make('tipe_dokumen')
                     ->relationship('doctype', 'document_name')
                     ->searchable()
                     ->preload()
                     ->multiple(),
                 
-                SelectFilter::make('divisi')
+                SelectFilter::make(name: 'divisi')
                     ->options(function () {
                         return DocumentRequest::whereNotNull('divisi')
                             ->distinct()
@@ -432,6 +586,7 @@ class DocumentRequestResource extends Resource
                     ->searchable()
                     ->multiple(),
                 
+                /*
                 Filter::make('my_requests')
                     ->label('My Requests')
                     ->query(fn (Builder $query): Builder => 
@@ -460,6 +615,7 @@ class DocumentRequestResource extends Resource
                     )
                     ->toggle(),
                 
+                // priority field is unnecessary
                 Filter::make('urgent_pending')
                     ->label('Urgent & Pending')
                     ->query(fn (Builder $query): Builder => 
@@ -467,7 +623,9 @@ class DocumentRequestResource extends Resource
                               ->whereNotIn('status', ['approved', 'rejected'])
                     )
                     ->toggle(),
-                
+                */
+
+                /*
                 Filter::make('created_at')
                     ->form([
                         DatePicker::make('created_from')
@@ -486,6 +644,7 @@ class DocumentRequestResource extends Resource
                                 fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
                             );
                     }),
+                */
             ])
             // CONTINUATION FROM PART 1 - ACTIONS SECTION
             ->actions([
@@ -671,9 +830,17 @@ class DocumentRequestResource extends Resource
                 ->label('View Discussion')
                 ->icon('heroicon-o-chat-bubble-left-right')
                 ->color('primary')
-                ->visible(fn($record) => in_array($record->status, ['in_discussion', 'agreement_creation']))
+                ->visible(function ($record) {
+                    $user = auth()->user(); // ambil user yang sedang login
+                    $allowedRoles = ['head_legal','reviewer_legal','general_manager','finance','head_finance','senior_manager','manager','supervisor','head'];
+                    
+                    // Tombol hanya terlihat jika status sesuai dan user punya role yang diperbolehkan
+                    return in_array($record->status, ['in_discussion', 'agreement_creation']) 
+                        && in_array($user->role, $allowedRoles);
+                })
                 ->url(fn($record) => static::getUrl('discussion', ['record' => $record])),
 
+            /*
             Tables\Actions\Action::make('close_discussion_forum')
                 ->label('Close Discussion')
                 ->icon('heroicon-o-lock-closed')
@@ -756,7 +923,9 @@ class DocumentRequestResource extends Resource
                     }
                     return 'Close discussion forum';
                 }),
+                */
     
+                /*
                 Tables\Actions\Action::make('view_approval_history')
                     ->label('Approval History')
                     ->icon('heroicon-o-clock')
@@ -809,7 +978,10 @@ class DocumentRequestResource extends Resource
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close')
                     ->visible(fn($record) => $record->status !== 'draft'),
+                */
             ])
+
+            /*
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()
@@ -854,6 +1026,8 @@ class DocumentRequestResource extends Resource
                         }),
                 ]),
             ])
+            */
+            ->actionsAlignment('start')
             ->defaultSort('created_at', 'desc')
             ->poll('30s')
             ->striped()
@@ -877,35 +1051,62 @@ class DocumentRequestResource extends Resource
                         Infolists\Components\Grid::make(3)
                             ->schema([
                                 Infolists\Components\TextEntry::make('nomor_dokumen')
-                                    ->label('Document Number')
+                                    ->label('Nomor Dokumen')
                                     ->placeholder('Pending Assignment')
                                     ->weight(FontWeight::Bold)
                                     ->color('primary')
                                     ->copyable(),
                                 Infolists\Components\TextEntry::make('title')
-                                    ->label('Document Title')
+                                    ->label('Judul Dokumen')
                                     ->weight(FontWeight::Medium),
                                 Infolists\Components\TextEntry::make('doctype.document_name')
-                                    ->label('Document Type')
+                                    ->label('Tipe Dokumen')
                                     ->badge()
                                     ->color('info'),
                             ]),
-                        Infolists\Components\Grid::make(4)
+                        Infolists\Components\Grid::make(3)
                             ->schema([
-                                Infolists\Components\TextEntry::make('status')
-                                    ->label('Current Status')
+                                Infolists\Components\TextEntry::make('computed_status')
                                     ->badge()
-                                    ->color(fn($state) => match($state) {
-                                        'draft' => 'secondary',
-                                        'pending_supervisor' => 'warning',
-                                        'pending_gm' => 'info',
-                                        'pending_legal_admin' => 'primary',
-                                        'in_discussion' => 'purple',
-                                        'approved' => 'success',
-                                        'rejected' => 'danger',
-                                        default => 'gray'
-                                    })
-                                    ->formatStateUsing(fn($state) => str_replace('_', ' ', ucwords($state))),
+                                    ->label('Status')
+                                    ->colors([
+                                        'warning' => 'pending_supervisor',
+                                        'info'    => 'pending_gm',
+                                        'primary' => ['pending_legal', 'pending_legal_admin'],
+                                        'gray'    => 'submitted',
+
+                                        // AO stages
+                                        'purple'  => \App\Models\AgreementOverview::STATUS_PENDING_HEAD,
+                                        'success' => \App\Models\AgreementOverview::STATUS_APPROVED,
+                                        'danger'  => \App\Models\AgreementOverview::STATUS_REJECTED,
+                                    ])
+                                    ->formatStateUsing(function ($state, $record) {
+                                        // sekarang $state sudah computed_status (bisa AO / docreq)
+                                        return match ($state) {
+                                            \App\Models\AgreementOverview::STATUS_DRAFT             => 'AO Draft',
+                                            \App\Models\AgreementOverview::STATUS_PENDING_HEAD      => 'AO - Pending Head',
+                                            \App\Models\AgreementOverview::STATUS_PENDING_GM        => 'AO - Pending GM',
+                                            \App\Models\AgreementOverview::STATUS_PENDING_FINANCE   => 'AO - Pending Finance',
+                                            \App\Models\AgreementOverview::STATUS_PENDING_LEGAL     => 'AO - Pending Legal',
+                                            \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR1 => 'AO - Pending Director 1',
+                                            \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR2 => 'AO - Pending Director 2',
+                                            \App\Models\AgreementOverview::STATUS_APPROVED          => 'AO Approved',
+                                            \App\Models\AgreementOverview::STATUS_REJECTED          => 'AO Rejected',
+                                            \App\Models\AgreementOverview::STATUS_REDISCUSS         => 'AO Back to Discussion',
+
+                                            'pending_supervisor'   => 'Pending Supervisor',
+                                            'pending_gm'           => 'Pending GM',
+                                            'pending_legal_admin'  => 'Pending Admin Legal',
+                                            'pending_legal'        => 'Pending Legal',
+                                            'in_discussion'        => 'On Discussion Forum',
+                                            'agreement_creation'   => 'Ready for AO',
+                                            'completed'            => 'Agreement Successful',
+                                            'approved'             => 'Approved',
+                                            'rejected'             => 'Rejected',
+                                            default                => 'You haven\'t been involved yet',
+                                        };
+                                    }),                                
+                                /* priority field is unnecessary
                                 Infolists\Components\TextEntry::make('priority')
                                     ->label('Priority Level')
                                     ->badge()
@@ -917,11 +1118,13 @@ class DocumentRequestResource extends Resource
                                         default => 'gray'
                                     })
                                     ->formatStateUsing(fn($state) => ucfirst($state)),
+                                */
                                 Infolists\Components\TextEntry::make('doc_filter')
                                     ->label('Document Action')
                                     ->badge()
                                     ->color('secondary')
                                     ->formatStateUsing(fn($state) => $state === 'create' ? 'Create New' : 'Review Existing'),
+                                /* is draft icon is unnecessary
                                 Infolists\Components\IconEntry::make('is_draft')
                                     ->label('Draft Status')
                                     ->boolean()
@@ -929,7 +1132,16 @@ class DocumentRequestResource extends Resource
                                     ->falseIcon('heroicon-o-paper-airplane')
                                     ->trueColor('gray')
                                     ->falseColor('success'),
+                                */
+                                Infolists\Components\TextEntry::make('lama_perjanjian_surat')
+                                    ->label('⏰ Jangka Waktu Perjanjian')
+                                    ->placeholder('Not specified'),
                             ]),
+                        Infolists\Components\TextEntry::make('description')
+                            ->label('📝 Deskripsi Dokumen')
+                            ->html()
+                            ->columnSpanFull()
+                            ->placeholder('Tidak ada deskripsi pada Document Request ini.'),
                     ]),
 
                 Infolists\Components\Section::make('👤 Requester Information')
@@ -957,100 +1169,117 @@ class DocumentRequestResource extends Resource
                                 Infolists\Components\TextEntry::make('direktorat')
                                     ->label('Directorate'),
                             ]),
-                        Infolists\Components\TextEntry::make('nik_atasan')
-                            ->label('Supervisor NIK')
-                            ->placeholder('Not specified'),
+                        Infolists\Components\Grid::make(3)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('nama_atasan')
+                                    ->label('Supervisor Name')
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('nik_atasan')
+                                    ->label('Supervisor NIK')
+                                    ->placeholder('Not specified'),
+                            ]),
                     ]),
 
-                Infolists\Components\Section::make('📋 Business Information')
+                Infolists\Components\Section::make('Informasi Dokumen')
                     ->schema([
-                        Infolists\Components\TextEntry::make('description')
-                                    ->label('Document Description')
-                                    ->columnSpanFull()
-                                    ->prose()
-                                    ->markdown(),
                         Infolists\Components\Grid::make(2)
                             ->schema([
-                                Infolists\Components\TextEntry::make('data')
-                                    ->label('Business Justification')
-                                    ->html()
-                                    ->prose(),
                                 Infolists\Components\TextEntry::make('lama_perjanjian_surat')
-                                    ->label('Contract Duration')
-                                    ->html()
-                                    ->prose(),
-                                ]),
+                                    ->label('⏰ Jangka Waktu Perjanjian')
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('doc_filter')
+                                    ->label('📑 Tipe Dokumen')
+                                    ->formatStateUsing(fn($state) => match($state) {
+                                        'review' => '🔍 Review',
+                                        'create' => '✨ Create New',
+                                        default => $state ?: 'Not specified'
+                                    })
+                                    ->badge(),
+                            ]),
+                        Infolists\Components\TextEntry::make('description')
+                            ->label('📝 Deskripsi Dokumen')
+                            ->html()
+                            ->columnSpanFull()
+                            ->placeholder('Tidak ada deskripsi pada Document Request ini.'),
+                        /*
+                        Infolists\Components\TextEntry::make('data')
+                            ->label('Business Justification')
+                            ->html()
+                            ->columnSpanFull(),
+                        */
                     ]),
 
-                Infolists\Components\Section::make('💰 Financial & Legal Terms')
+                // HAK & KEWAJIBAN - SELALU TAMPIL
+                Infolists\Components\Section::make('⚖️ Hak & Kewajiban')
                     ->schema([
-                        Infolists\Components\TextEntry::make('syarat_ketentuan_pembayaran')
-                            ->label('Payment Terms & Conditions')
-                            ->html()
-                            ->prose()
-                            ->placeholder('Not specified')
-                            ->columnSpanFull(),
-                        Infolists\Components\TextEntry::make('pajak')
-                            ->label('Tax Considerations')
-                            ->html()
-                            ->prose()
-                            ->placeholder('Not specified')
-                            ->columnSpanFull(),
                         Infolists\Components\Grid::make(2)
                             ->schema([
-                                Infolists\Components\TextEntry::make('hak_mitra')
-                                    ->label('Partner Rights')
-                                    ->html()
-                                    ->prose()
-                                    ->placeholder('Not defined'),
                                 Infolists\Components\TextEntry::make('kewajiban_mitra')
-                                    ->label('Partner Obligations')
+                                    ->label('📝 Kewajiban Mitra')
                                     ->html()
-                                    ->prose()
-                                    ->placeholder('Not defined'),
-                            ]),
-                        Infolists\Components\Grid::make(2)
-                            ->schema([
-                                Infolists\Components\TextEntry::make('hak_eci')
-                                    ->label('Company (ECI) Rights')
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('hak_mitra')
+                                    ->label('✅ Hak Mitra')
                                     ->html()
-                                    ->prose()
-                                    ->placeholder('Not defined'),
+                                    ->placeholder('Not specified'),
                                 Infolists\Components\TextEntry::make('kewajiban_eci')
-                                    ->label('Company (ECI) Obligations')
+                                    ->label('📝 Kewajiban ECI')
                                     ->html()
-                                    ->prose()
-                                    ->placeholder('Not defined'),
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('hak_eci')
+                                    ->label('✅ Hak ECI')
+                                    ->html()
+                                    ->placeholder('Not specified'),
                             ]),
-                        Infolists\Components\TextEntry::make('ketentuan_lain')
-                            ->label('Additional Provisions')
-                            ->html()
-                            ->prose()
-                            ->placeholder('No additional provisions')
-                            ->columnSpanFull(),
                     ])
                     ->collapsible(),
 
-                Infolists\Components\Section::make('📎 Document Attachments')
-                    ->description('Click on any file to download and review')
+                // CONTRACT TERMS - SELALU TAMPIL
+                Infolists\Components\Section::make('📋 Regulasi Finansial')
                     ->schema([
+                        Infolists\Components\TextEntry::make('syarat_ketentuan_pembayaran')
+                            ->label('💰 Syarat & Ketentuan Pembayaran')
+                            ->columnSpanFull()
+                            ->html()
+                            ->placeholder('Not specified'),
+                        Infolists\Components\TextEntry::make('pajak')
+                            ->label('📊 Ketentuan Pajak')
+                            ->columnSpanFull()
+                            ->html()
+                            ->placeholder('Not specified'),
+                    ])
+                    ->collapsible(),
+
+                // ADDITIONAL TERMS - SELALU TAMPIL
+                Infolists\Components\Section::make('📄 Ketentuan Tambahan')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('ketentuan_lain')
+                            ->label('📋 Ketentuan Lainnya')
+                            ->columnSpanFull()
+                            ->html()
+                            ->placeholder('Tidak ada ketentuan tambahan.'),
+                    ])
+                    ->collapsible(),
+
+                // ATTACHMENTS - SELALU TAMPIL tanpa visible condition
+                Infolists\Components\Section::make('📎 Lampiran Dokumen')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('dokumen_utama')
+                            ->label('📄 Main Document')
+                            ->formatStateUsing(function($state) {
+                                if (!$state) return '❌ Not uploaded';
+                                $filename = basename($state);
+                                $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                return "📁 {$filename} ({$extension})";
+                            })
+                            ->url(fn ($record) => $record->dokumen_utama ? asset('storage/' . $record->dokumen_utama) : null)
+                            ->openUrlInNewTab()
+                            ->color(fn($state) => $state ? 'success' : 'danger')
+                            ->tooltip(fn($state) => $state ? basename($state) : 'No file'),
                         Infolists\Components\Grid::make(2)
-                            ->schema([
-                                Infolists\Components\TextEntry::make('dokumen_utama')
-                                    ->label('📄 Main Document')
-                                    ->formatStateUsing(function($state) {
-                                        if (!$state) return '❌ Not uploaded';
-                                        $filename = basename($state);
-                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
-                                        return "📁 {$filename} ({$extension})";
-                                    })
-                                    ->url(fn ($record) => $record->dokumen_utama ? asset('storage/' . $record->dokumen_utama) : null)
-                                    ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'danger')
-                                    ->weight(FontWeight::Medium),
-                                
+                            ->schema([                                
                                 Infolists\Components\TextEntry::make('akta_pendirian')
-                                    ->label('🏢 Articles of Incorporation')
+                                    ->label('🏢 Akta Pendirian')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -1060,20 +1289,9 @@ class DocumentRequestResource extends Resource
                                     ->url(fn ($record) => $record->akta_pendirian ? asset('storage/' . $record->akta_pendirian) : null)
                                     ->openUrlInNewTab()
                                     ->color(fn($state) => $state ? 'success' : 'gray')
-                                    ->weight(FontWeight::Medium),
-                                
-                                Infolists\Components\TextEntry::make('ktp_direktur')
-                                    ->label('🆔 Director ID Card')
-                                    ->formatStateUsing(function($state) {
-                                        if (!$state) return '➖ Not provided';
-                                        $filename = basename($state);
-                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
-                                        return "📁 {$filename} ({$extension})";
-                                    })
-                                    ->url(fn ($record) => $record->ktp_direktur ? asset('storage/' . $record->ktp_direktur) : null)
-                                    ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
-                                
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->akta_pendirian), // full text muncul di hover
+
                                 Infolists\Components\TextEntry::make('akta_perubahan')
                                     ->label('📋 Akta Perubahan')
                                     ->formatStateUsing(function($state) {
@@ -1084,22 +1302,40 @@ class DocumentRequestResource extends Resource
                                     })
                                     ->url(fn ($record) => $record->akta_perubahan ? asset('storage/' . $record->akta_perubahan) : null)
                                     ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
-                                
-                                Infolists\Components\TextEntry::make('surat_kuasa')
-                                    ->label('✍️ Surat Kuasa')
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->akta_perubahan), // full text muncul di hover
+
+                                Infolists\Components\TextEntry::make('npwp')
+                                    ->label('📋 NPWP (Nomor Pokok Wajib Pajak)')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
                                         $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
                                         return "📁 {$filename} ({$extension})";
                                     })
-                                    ->url(fn ($record) => $record->surat_kuasa ? asset('storage/' . $record->surat_kuasa) : null)
+                                    ->url(fn ($record) => $record->npwp ? asset('storage/' . $record->npwp) : null)
                                     ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->npwp), // full text muncul di hover
                                 
+                                Infolists\Components\TextEntry::make('ktp_direktur')
+                                    ->label('🆔 KTP kuasa Direktur')
+                                    ->formatStateUsing(function($state) {
+                                        if (!$state) return '➖ Not provided';
+                                        $filename = basename($state);
+                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                        return "📁 {$filename} ({$extension})";
+                                    })
+                                    ->url(fn ($record) => $record->ktp_direktur ? asset('storage/' . $record->ktp_direktur) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->ktp_direktur), // full text muncul di hover
+
                                 Infolists\Components\TextEntry::make('nib')
-                                    ->label('🏪 NIB')
+                                    ->label('🏪 NIB (Nomor Induk Berusaha)')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -1108,30 +1344,28 @@ class DocumentRequestResource extends Resource
                                     })
                                     ->url(fn ($record) => $record->nib ? asset('storage/' . $record->nib) : null)
                                     ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
-                            ]),
-                        Infolists\Components\Grid::make(2)
-                            ->schema([
-                                Infolists\Components\TextEntry::make('supporting_documents')
-                                    ->label('📋 Supporting Documents')
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->nib), // full text muncul di hover
+                                
+                                Infolists\Components\TextEntry::make('surat_kuasa')
+                                    ->label('✍️ Surat kuasa Direktur')
                                     ->formatStateUsing(function($state) {
-                                        if (!$state || !is_array($state)) return '➖ No supporting documents';
-                                        $count = count($state);
-                                        return "📁 {$count} file(s) uploaded";
+                                        if (!$state) return '➖ Not provided';
+                                        $filename = basename($state);
+                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                        return "📁 {$filename} ({$extension})";
                                     })
-                                    ->color(fn($state) => $state && is_array($state) && count($state) > 0 ? 'success' : 'gray'),
-                                    
-                                Infolists\Components\TextEntry::make('reference_documents')
-                                    ->label('📖 Reference Documents')
-                                    ->formatStateUsing(function($state) {
-                                        if (!$state || !is_array($state)) return '➖ No reference documents';
-                                        $count = count($state);
-                                        return "📁 {$count} file(s) uploaded";
-                                    })
-                                    ->color(fn($state) => $state && is_array($state) && count($state) > 0 ? 'success' : 'gray'),
+                                    ->url(fn ($record) => $record->surat_kuasa ? asset('storage/' . $record->surat_kuasa) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->surat_kuasa), // full text muncul di hover
                             ]),
                     ])
                     ->collapsible(),
+                    
+// DISCUSSION FORUM - HANYA TAMPIL JIKA STATUS discussion
 Infolists\Components\Section::make('Discussion Forum')
     ->schema([
         Infolists\Components\TextEntry::make('discussion_status')
@@ -1162,10 +1396,13 @@ Infolists\Components\Section::make('Discussion Forum')
             ->label('Participants')
             ->getStateUsing(fn ($record) => $record->comments()->distinct('user_nik')->count()),
             
-        Infolists\Components\IconEntry::make('finance_participated')
+        Infolists\Components\TextEntry::make('finance_participated')
             ->label('Finance Participated')
-            ->getStateUsing(fn ($record) => $record->hasFinanceParticipated())
-            ->boolean(),
+            ->getStateUsing(fn ($record) => 
+                $record->hasFinanceParticipated() ? 'Already' : 'Not yet'
+            )
+            ->badge()
+            ->color(fn ($state) => $state === 'Already' ? 'success' : 'gray'),
     ])
     ->columns(4)
     ->visible(fn ($record) => $record->status === 'discussion'),
@@ -1306,6 +1543,128 @@ Infolists\Components\Section::make('Discussion Forum')
                             ->columnSpanFull(),
                     ])
                     ->visible(fn($record) => $record->approvals()->count() > 0),
+                
+                // Enhanced Action Buttons
+                Infolists\Components\Section::make('🎯 Approval Actions')
+                    ->description('Review the document carefully and make your decision')
+                    ->schema([
+                        Infolists\Components\Actions::make([
+                            Infolists\Components\Actions\Action::make('approve')
+                                ->label('✅ Approve Document')
+                                ->icon('heroicon-o-check-circle')
+                                ->color('success')
+                                ->size('lg')
+                                ->form([
+                                    Forms\Components\Textarea::make('approval_comments')
+                                        ->label('💬 Approval Comments')
+                                        ->rows(3)
+                                        ->helperText('Optional: Add your comments for this approval'),
+                                ])
+                                ->action(function ($record, array $data) {
+                                    try {
+                                        $approval = $record->approvals()
+                                            ->where('approver_nik', auth()->user()->nik)
+                                            ->where('status', 'pending')
+                                            ->first();
+
+                                        if (!$approval) {
+                                            $approval = static::createImplicitApproval($record, auth()->user());
+                                            if (!$approval) {
+                                                throw new \Exception('No pending approval found for your role');
+                                            }
+                                        }
+
+                                        $success = app(DocumentRequestService::class)->processApproval(
+                                            $approval,
+                                            'approve',
+                                            $data['approval_comments'] ?? null,
+                                            auth()->user()
+                                        );
+                                        
+                                        if ($success) {
+                                            Notification::make()
+                                                ->title('✅ Document approved successfully')
+                                                ->body('The document has been approved and forwarded to the next step.')
+                                                ->success()
+                                                ->send();
+                                                
+                                            return redirect()->to(DocumentRequestResource::getUrl('index'));
+                                        } else {
+                                            throw new \Exception('Failed to process approval');
+                                        }
+                                    } catch (\Exception $e) {
+                                        Notification::make()
+                                            ->title('❌ Error approving document')
+                                            ->body($e->getMessage())
+                                            ->danger()
+                                            ->send();
+                                    }
+                                })
+                                ->requiresConfirmation()
+                                ->modalHeading('✅ Approve Document')
+                                ->modalDescription('Are you sure you want to approve this document request?'),
+
+                            Infolists\Components\Actions\Action::make('reject')
+                                ->label('❌ Reject Document')
+                                ->icon('heroicon-o-x-circle')
+                                ->color('danger')
+                                ->size('lg')
+                                ->form([
+                                    Forms\Components\Textarea::make('rejection_reason')
+                                        ->label('📝 Rejection Reason')
+                                        ->required()
+                                        ->rows(3)
+                                        ->helperText('Please provide a clear reason for rejection'),
+                                ])
+                                ->action(function ($record, array $data) {
+                                    try {
+                                        $approval = $record->approvals()
+                                            ->where('approver_nik', auth()->user()->nik)
+                                            ->where('status', 'pending')
+                                            ->first();
+
+                                        if (!$approval) {
+                                            $approval = static::createImplicitApproval($record, auth()->user());
+                                            if (!$approval) {
+                                                throw new \Exception('No pending approval found for your role');
+                                            }
+                                        }
+
+                                        $success = app(DocumentRequestService::class)->processApproval(
+                                            $approval,
+                                            'reject',
+                                            $data['rejection_reason'],
+                                            auth()->user()
+                                        );
+                                        
+                                        if ($success) {
+                                            Notification::make()
+                                                ->title('❌ Document rejected')
+                                                ->body('The document has been rejected and returned to the requester.')
+                                                ->success()
+                                                ->send();
+                                                
+                                            return redirect()->to(DocumentRequestResource::getUrl('index'));
+                                        } else {
+                                            throw new \Exception('Failed to process rejection');
+                                        }
+                                    } catch (\Exception $e) {
+                                        Notification::make()
+                                            ->title('❌ Error rejecting document')
+                                            ->body($e->getMessage())
+                                            ->danger()
+                                            ->send();
+                                    }
+                                })
+                                ->requiresConfirmation()
+                                ->modalHeading('❌ Reject Document')
+                                ->modalDescription('Are you sure you want to reject this document request?'),
+                        ])->columnSpanFull(),
+                    ])
+                    ->visible(function ($record) {
+                        return app(\App\Services\DocumentWorkflowService::class)
+                            ->canUserApproveDocument($record, auth()->user());
+                    }),
             ]);
     }
 

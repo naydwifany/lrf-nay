@@ -71,6 +71,7 @@ class ViewDocumentRequest extends ViewRecord
                            $record->description;
                 }),
 
+            /* approve/reject move to below infolist on DocumentRequestResource.php
             // Approve Action
             Actions\Action::make('approve')
                 ->label('Approve Document')
@@ -189,6 +190,7 @@ class ViewDocumentRequest extends ViewRecord
                         ->where('status', 'pending')
                         ->exists();
                 }),
+            */
 
             // Approval History Action
             Actions\Action::make('approval_history')
@@ -227,20 +229,20 @@ class ViewDocumentRequest extends ViewRecord
                             $comments = $approval->comments ?: 'No comments provided';
                             
                             $content .= "
-                                <div class='border rounded-lg p-4 bg-white shadow-sm'>
+                                <div class='border rounded-lg p-4 bg-white dark:bg-gray-800 shadow-sm'>
                                     <div class='flex justify-between items-start mb-3'>
                                         <div>
-                                            <h4 class='font-semibold text-gray-900 text-lg'>{$approverName}</h4>
-                                            <p class='text-sm text-gray-600 font-medium'>{$approvalType}</p>
+                                            <h4 class='font-semibold text-gray-900 dark:text-white-900 text-lg mb-1'>{$approverName}</h4>
+                                            <p class='text-sm text-gray-900 dark:text-white-900 font-medium mb-2'>{$approvalType}</p>
                                         </div>
                                         <span class='inline-flex items-center px-3 py-1 text-sm font-medium rounded-full border {$statusColor}'>
                                             {$statusIcon} " . ucfirst($approval->status) . "
                                         </span>
                                     </div>
                                     <div class='space-y-2'>
-                                        <p class='text-sm text-gray-700'><strong>📅 Date:</strong> {$date}</p>
-                                        <p class='text-sm text-gray-700'><strong>💬 Comments:</strong></p>
-                                        <div class='bg-gray-50 rounded p-3 text-sm text-gray-600'>{$comments}</div>
+                                        <p class='text-sm text-gray-700 dark:text-white mb-2'><strong>📅 Date:</strong> {$date}</p>
+                                        <p class='text-sm text-gray-700 dark:text-white mb-2'><strong>💬 Comments:</strong></p>
+                                        <div class='bg-gray-200 dark:bg-gray-900 rounded p-3 text-sm text-gray-600 dark:text-white-900'>{$comments}</div>
                                     </div>
                                 </div>
                             ";

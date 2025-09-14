@@ -205,7 +205,8 @@ class MyApprovalResource extends Resource
                         'pending_legal' => 'Pending Legal',
                         default => str_replace('_', ' ', ucwords($state))
                     }),
-                    
+                
+                /*
                 Tables\Columns\BadgeColumn::make('priority')
                     ->colors([
                         'success' => 'low',
@@ -213,6 +214,7 @@ class MyApprovalResource extends Resource
                         'warning' => 'high',
                         'danger' => 'urgent',
                     ]),
+                */
                     
                 Tables\Columns\TextColumn::make('submitted_at')
                     ->label('Submitted')
@@ -258,6 +260,7 @@ class MyApprovalResource extends Resource
                     ->color('info'),
             ])
             ->filters([
+                /*
                 SelectFilter::make('priority')
                     ->options([
                         'low' => 'Low',
@@ -265,7 +268,8 @@ class MyApprovalResource extends Resource
                         'high' => 'High',
                         'urgent' => 'Urgent',
                     ]),
-                    
+                */
+
                 SelectFilter::make('status')
                     ->options([
                         'pending_supervisor' => 'Pending Supervisor',
@@ -284,6 +288,7 @@ class MyApprovalResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 
+                /* approve/reject move to infolist below
                 Tables\Actions\Action::make('approve')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
@@ -406,7 +411,9 @@ class MyApprovalResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading('Reject Document Request')
                     ->modalDescription('Are you sure you want to reject this document request?'),
+                */
             ])
+
             ->bulkActions([])
             ->defaultSort('submitted_at', 'asc')
             ->poll('30s')
@@ -476,15 +483,16 @@ class MyApprovalResource extends Resource
                         Infolists\Components\Grid::make(3)
                             ->schema([
                                 Infolists\Components\TextEntry::make('nomor_dokumen')
-                                    ->label('Document Number')
+                                    ->label('Nomor Dokumen')
                                     ->placeholder('Not assigned')
                                     ->weight(FontWeight::Bold)
+                                    ->copyable()
                                     ->color('primary'),
                                 Infolists\Components\TextEntry::make('title')
-                                    ->label('Document Title')
+                                    ->label('Nama Mitra')
                                     ->weight(FontWeight::Medium),
                                 Infolists\Components\TextEntry::make('doctype.document_name')
-                                    ->label('Document Type')
+                                    ->label('Tipe Dokumen')
                                     ->badge()
                                     ->color('info'),
                             ]),
@@ -499,6 +507,8 @@ class MyApprovalResource extends Resource
                                         'pending_legal', 'pending_legal_admin' => 'primary',
                                         default => 'gray'
                                     }),
+                                
+                                /*
                                 Infolists\Components\TextEntry::make('priority')
                                     ->label('Priority')
                                     ->badge()
@@ -509,6 +519,8 @@ class MyApprovalResource extends Resource
                                         'urgent' => 'danger',
                                         default => 'gray'
                                     }),
+                                */
+
                                 Infolists\Components\TextEntry::make('approval_level')
                                     ->label('Your Role in Approval')
                                     ->getStateUsing(function ($record) {
@@ -550,95 +562,184 @@ class MyApprovalResource extends Resource
                             ]),
                     ]),
 
-                Infolists\Components\Section::make('Business Information')
-                    ->schema([
-                        Infolists\Components\TextEntry::make('description')
-                            ->label('Document Description')
-                            ->columnSpanFull()
-                            ->prose()
-                            ->markdown(),
-                        Infolists\Components\TextEntry::make('data')
-                            ->label('Business Justification')
-                            ->columnSpanFull()
-                            ->html()
-                            ->prose(),
-                    ]),
-
-                // Document Attachments Section
-                Infolists\Components\Section::make('📎 Document Attachments')
-                    ->description('Click on any file to download and review')
+                Infolists\Components\Section::make('Informasi Dokumen')
                     ->schema([
                         Infolists\Components\Grid::make(2)
                             ->schema([
-                                Infolists\Components\TextEntry::make('dokumen_utama')
-                                    ->label('📄 Document Utama')
+                                Infolists\Components\TextEntry::make('lama_perjanjian_surat')
+                                    ->label('⏰ Jangka Waktu Perjanjian')
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('doc_filter')
+                                    ->label('📑 Tipe Dokumen')
+                                    ->formatStateUsing(fn($state) => match($state) {
+                                        'review' => '🔍 Review',
+                                        'create' => '✨ Create New',
+                                        default => $state ?: 'Not specified'
+                                    })
+                                    ->badge(),
+                            ]),
+                        Infolists\Components\TextEntry::make('description')
+                            ->label('📝 Deskripsi Dokumen')
+                            ->html()
+                            ->columnSpanFull()
+                            ->placeholder('Tidak ada deskripsi pada Document Request ini.'),
+                        /*
+                        Infolists\Components\TextEntry::make('data')
+                            ->label('Business Justification')
+                            ->html()
+                            ->columnSpanFull(),
+                        */
+                    ]),
+
+                // HAK & KEWAJIBAN - SELALU TAMPIL
+                Infolists\Components\Section::make('⚖️ Hak & Kewajiban')
+                    ->schema([
+                        Infolists\Components\Grid::make(2)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('kewajiban_mitra')
+                                    ->label('📝 Kewajiban Mitra')
+                                    ->html()
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('hak_mitra')
+                                    ->label('✅ Hak Mitra')
+                                    ->html()
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('kewajiban_eci')
+                                    ->label('📝 Kewajiban ECI')
+                                    ->html()
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('hak_eci')
+                                    ->label('✅ Hak ECI')
+                                    ->html()
+                                    ->placeholder('Not specified'),
+                            ]),
+                    ]),
+
+                // CONTRACT TERMS - SELALU TAMPIL
+                Infolists\Components\Section::make('📋 Regulasi Finansial')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('syarat_ketentuan_pembayaran')
+                            ->label('💰 Syarat & Ketentuan Pembayaran')
+                            ->columnSpanFull()
+                            ->html()
+                            ->placeholder('Not specified'),
+                        Infolists\Components\TextEntry::make('pajak')
+                            ->label('📊 Ketentuan Pajak')
+                            ->columnSpanFull()
+                            ->html()
+                            ->placeholder('Not specified'),
+                    ]),
+
+                // ADDITIONAL TERMS - SELALU TAMPIL
+                Infolists\Components\Section::make('📄 Ketentuan Tambahan')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('ketentuan_lain')
+                            ->label('📋 Ketentuan Lainnya')
+                            ->columnSpanFull()
+                            ->html()
+                            ->placeholder('Tidak ada ketentuan tambahan.'),
+                    ]),
+
+                // ATTACHMENTS - SELALU TAMPIL tanpa visible condition
+                Infolists\Components\Section::make('📎 Lampiran Dokumen')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('dokumen_utama')
+                            ->label('📄 Main Document')
+                            ->formatStateUsing(function($state) {
+                                if (!$state) return '❌ Not uploaded';
+                                $filename = basename($state);
+                                $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                return "📁 {$filename} ({$extension})";
+                            })
+                            ->url(fn ($record) => $record->dokumen_utama ? asset('storage/' . $record->dokumen_utama) : null)
+                            ->openUrlInNewTab()
+                            ->color(fn($state) => $state ? 'success' : 'danger')
+                            ->tooltip(fn($state) => $state ? basename($state) : 'No file'),
+                        Infolists\Components\Grid::make(2)
+                            ->schema([                                
+                                Infolists\Components\TextEntry::make('akta_pendirian')
+                                    ->label('🏢 Akta Pendirian')
                                     ->formatStateUsing(function($state) {
-                                        if (!$state) return '❌ Not uploaded';
+                                        if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
                                         $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
                                         return "📁 {$filename} ({$extension})";
                                     })
-                                    ->url(fn ($record) => $record->dokumen_utama ? asset('storage/' . $record->dokumen_utama) : null)
+                                    ->url(fn ($record) => $record->akta_pendirian ? asset('storage/' . $record->akta_pendirian) : null)
                                     ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'danger')
-                                    ->weight(FontWeight::Medium),
-                                
-                                Infolists\Components\TextEntry::make('ktp_direktur')
-                                    ->label('KTP Direktur')
-                                    ->formatStateUsing(function($state) {
-                                        if (!$state) return '➖ Not provided';
-                                        $filename = basename($state);
-                                        return "📁 {$filename}";
-                                    })
-                                    ->url(fn ($record) => $record->ktp_direktur ? asset('storage/' . $record->ktp_direktur) : null)
-                                    ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->akta_pendirian), // full text muncul di hover
 
                                 Infolists\Components\TextEntry::make('akta_perubahan')
-                                    ->label('🏢 Akta Perubahan')
+                                    ->label('📋 Akta Perubahan')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
-                                        return "📁 {$filename}";
+                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                        return "📁 {$filename} ({$extension})";
                                     })
                                     ->url(fn ($record) => $record->akta_perubahan ? asset('storage/' . $record->akta_perubahan) : null)
                                     ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
-                                
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->akta_perubahan), // full text muncul di hover
+
                                 Infolists\Components\TextEntry::make('npwp')
-                                    ->label('NPWP')
+                                    ->label('📋 NPWP (Nomor Pokok Wajib Pajak)')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
-                                        return "📁 {$filename}";
+                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                        return "📁 {$filename} ({$extension})";
                                     })
                                     ->url(fn ($record) => $record->npwp ? asset('storage/' . $record->npwp) : null)
                                     ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->npwp), // full text muncul di hover
                                 
-                                Infolists\Components\TextEntry::make('surat_kuasa')
-                                    ->label('Surat Kuasa')
+                                Infolists\Components\TextEntry::make('ktp_direktur')
+                                    ->label('🆔 KTP kuasa Direktur')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
-                                        return "📁 {$filename}";
+                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                        return "📁 {$filename} ({$extension})";
                                     })
-                                    ->url(fn ($record) => $record->surat_kuasa ? asset('storage/' . $record->surat_kuasa) : null)
+                                    ->url(fn ($record) => $record->ktp_direktur ? asset('storage/' . $record->ktp_direktur) : null)
                                     ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->ktp_direktur), // full text muncul di hover
 
                                 Infolists\Components\TextEntry::make('nib')
-                                    ->label('NIB')
+                                    ->label('🏪 NIB (Nomor Induk Berusaha)')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
-                                        return "📁 {$filename}";
+                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                        return "📁 {$filename} ({$extension})";
                                     })
                                     ->url(fn ($record) => $record->nib ? asset('storage/' . $record->nib) : null)
                                     ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->nib), // full text muncul di hover
                                 
-                                
+                                Infolists\Components\TextEntry::make('surat_kuasa')
+                                    ->label('✍️ Surat kuasa Direktur')
+                                    ->formatStateUsing(function($state) {
+                                        if (!$state) return '➖ Not provided';
+                                        $filename = basename($state);
+                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                        return "📁 {$filename} ({$extension})";
+                                    })
+                                    ->url(fn ($record) => $record->surat_kuasa ? asset('storage/' . $record->surat_kuasa) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->surat_kuasa), // full text muncul di hover
                             ]),
                     ]),
 
@@ -707,7 +808,7 @@ class MyApprovalResource extends Resource
                     ->schema([
                         Infolists\Components\Actions::make([
                             Infolists\Components\Actions\Action::make('approve')
-                                ->label('✅ Approve Document')
+                                ->label('Approve Document')
                                 ->icon('heroicon-o-check-circle')
                                 ->color('success')
                                 ->size('lg')
@@ -762,7 +863,7 @@ class MyApprovalResource extends Resource
                                 ->modalDescription('Are you sure you want to approve this document request?'),
 
                             Infolists\Components\Actions\Action::make('reject')
-                                ->label('❌ Reject Document')
+                                ->label('Reject Document')
                                 ->icon('heroicon-o-x-circle')
                                 ->color('danger')
                                 ->size('lg')
@@ -817,7 +918,11 @@ class MyApprovalResource extends Resource
                                 ->modalHeading('❌ Reject Document')
                                 ->modalDescription('Are you sure you want to reject this document request?'),
                         ])->columnSpanFull(),
-                    ]),
+                    ])
+                    ->visible(function ($record) {
+                        return app(\App\Services\DocumentWorkflowService::class)
+                            ->canUserApproveDocument($record, auth()->user());
+                    }),
             ]);
     }
 

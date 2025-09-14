@@ -13,8 +13,8 @@ class Dashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
-            \App\Filament\Admin\Widgets\MyDocumentStatsWidget::class,
-            \App\Filament\Admin\Widgets\PendingApprovalWidget::class,
+            \App\Filament\User\Widgets\MyDocumentStatsWidget::class,
+            \App\Filament\User\Widgets\PendingApprovalWidget::class,
         ];
     }
 

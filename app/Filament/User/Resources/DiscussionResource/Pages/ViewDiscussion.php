@@ -42,9 +42,10 @@ class ViewDiscussion extends ViewRecord
                     return $user->role === 'head_legal' && 
                            !$this->isDiscussionClosed();
                 })
-                ->disabled(function () {
-                    return !$this->canCloseDiscussion();
-                })
+                ->disabled(fn() => !(
+                    ($this->discussionStats['finance_participated'] ?? false) || 
+                    ($this->discussionStats['head_finance_participated'] ?? false)
+                ))
                 ->form([
                     Forms\Components\Textarea::make('reason')
                         ->label('Closure Reason')

@@ -67,10 +67,10 @@
                     <div class="text-sm text-gray-600 dark:text-gray-400">Participants</div>
                 </div>
                 <div class="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 flex-1 min-w-[120px] text-center shadow-sm dark:shadow-gray-900/20">
-                    <div class="text-2xl font-bold {{ ($discussionStats['finance_participated'] ?? false) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
-                        {{ ($discussionStats['finance_participated'] ?? false) ? '✓' : '✗' }}
-                    </div>
-                    <div class="text-sm text-gray-600 dark:text-gray-400">Finance</div>
+                <div class="text-2xl font-bold {{ ($discussionStats['finance_participated'] ?? false) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
+                    {{ $discussionStats['finance_participated'] ? 'Already' : 'Not yet' }}
+                </div> 
+                <div class="text-sm text-gray-600 dark:text-gray-400">Finance Involved</div>
                 </div>
                 <div class="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 flex-1 min-w-[120px] text-center shadow-sm dark:shadow-gray-900/20">
                     <div class="text-2xl font-bold {{ ($discussionStats['is_closed'] ?? false) ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400' }}">

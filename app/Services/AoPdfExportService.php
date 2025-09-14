@@ -9,12 +9,22 @@ class AoPdfExportService
 {
     public function generate(AgreementOverview $ao): string
     {
-        $pdfPath = storage_path("app/agreements/ao_{$ao->id}.pdf");
+        $pdfPath   = storage_path("app/agreements/ao_{$ao->id}.pdf");
         $stampPath = storage_path("app/templates/stamps/approved.png");
+        $stampUrl  = 'file://' . $stampPath;
 
         $fmtDate = fn($date) => $date
             ? \Carbon\Carbon::parse($date)->isoFormat('D MMMM Y')
             : '-';
+
+        // Helper untuk cell stamp
+        $stampCell = fn($approvedAt) => $approvedAt
+            ? '<img src="'.$stampUrl.'" width="80" height="80" />'
+            : '<div style="height:80px"></div>';
+
+        // Ambil data approval (contoh, sesuaikan sama model relasi kamu)
+        $approvals = $ao->approvals->keyBy('role'); 
+        // role bisa: head, finance, legal, director1, director2
 
         // Header info
         $html = <<<HTML
@@ -92,6 +102,29 @@ class AoPdfExportService
             *Tanggal AO adalah tanggal saat Agreement Overview diterima oleh Penandatangan.
         </p>
         HTML;
+
+        // Replace placeholders
+        $replacements = [
+            '{{approved_stamp_head}}'      => $stampCell($approvals['head']->approved_at ?? null),
+            '{{approved_stamp_finance}}'   => $stampCell($approvals['finance']->approved_at ?? null),
+            '{{approved_stamp_legal}}'     => $stampCell($approvals['legal']->approved_at ?? null),
+            '{{approved_stamp_director1}}' => $stampCell($approvals['director1']->approved_at ?? null),
+            '{{approved_stamp_director2}}' => $stampCell($approvals['director2']->approved_at ?? null),
+
+            '{{approver_name_head}}'       => $approvals['head']->approver_name ?? '',
+            '{{approver_name_finance}}'    => $approvals['finance']->approver_name ?? '',
+            '{{approver_name_legal}}'      => $approvals['legal']->approver_name ?? '',
+            '{{approver_name_director1}}'  => $approvals['director1']->approver_name ?? '',
+            '{{approver_name_director2}}'  => $approvals['director2']->approver_name ?? '',
+
+            '{{approved_at_head}}'         => $fmtDate($approvals['head']->approved_at ?? null),
+            '{{approved_at_finance}}'      => $fmtDate($approvals['finance']->approved_at ?? null),
+            '{{approved_at_legal}}'        => $fmtDate($approvals['legal']->approved_at ?? null),
+            '{{approved_at_director1}}'    => $fmtDate($approvals['director1']->approved_at ?? null),
+            '{{approved_at_director2}}'    => $fmtDate($approvals['director2']->approved_at ?? null),
+        ];
+
+        $html = strtr($html, $replacements);
 
         // Render PDF
         $mpdf = new Mpdf([

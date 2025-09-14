@@ -76,7 +76,7 @@ class DocumentRequest extends Model
 
     public function agreementOverview()
     {
-        return $this->hasOne(AgreementOverview::class, 'lrf_doc_id');
+        return $this->hasOne(AgreementOverview::class, 'document_request_id');
     }
 
     public function forumStatus()
@@ -376,5 +376,11 @@ public function canCloseDiscussion(?User $user = null): bool
             ->where('approver_nik', $this->nik)
             ->where('status', DocumentApproval::STATUS_PENDING)
             ->exists();
+    }
+
+    public function getComputedStatusAttribute(): string
+    {
+        return app(\App\Services\DocumentWorkflowService::class)
+            ->getDocumentStatus($this);
     }
 }

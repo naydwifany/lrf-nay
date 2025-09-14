@@ -46,6 +46,7 @@ class PendingApprovalWidget extends BaseWidget
                         'primary' => 'pending_legal',
                         'gray' => 'submitted',
                     ]),
+                /*
                 Tables\Columns\BadgeColumn::make('priority')
                     ->colors([
                         'success' => 'low',
@@ -53,6 +54,7 @@ class PendingApprovalWidget extends BaseWidget
                         'warning' => 'high',
                         'danger' => 'urgent',
                     ]),
+                */
                 Tables\Columns\TextColumn::make('submitted_at')
                     ->since()
                     ->label('Submitted')
@@ -136,6 +138,7 @@ class PendingApprovalWidget extends BaseWidget
                     ->openUrlInNewTab(),
             ])
             ->filters([
+                /*
                 Tables\Filters\SelectFilter::make('priority')
                     ->options([
                         'low' => 'Low',
@@ -143,6 +146,7 @@ class PendingApprovalWidget extends BaseWidget
                         'high' => 'High',
                         'urgent' => 'Urgent',
                     ]),
+                */
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
                         'pending_supervisor' => 'Pending Supervisor',

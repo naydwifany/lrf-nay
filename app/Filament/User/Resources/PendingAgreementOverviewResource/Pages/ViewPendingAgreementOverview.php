@@ -21,6 +21,7 @@ class ViewPendingAgreementOverview extends ViewRecord
         $user = auth()->user();
 
         return [
+            /* approve/reject/send to rediscuss buttons moved to infolist in PendingAgreementOverviewResource.php
             Actions\Action::make('approve')
                 ->label('Approve')
                 ->icon('heroicon-o-check-circle')
@@ -86,41 +87,7 @@ class ViewPendingAgreementOverview extends ViewRecord
                         
                     return redirect()->route('filament.user.resources.pending-agreement-overviews.index');
                 }),
-
-            Actions\Action::make('rediscuss')
-                ->label('Send to Re-discussion')
-                ->icon('heroicon-o-chat-bubble-left-right')
-                ->color('warning')
-                ->visible(function () use ($user, $canApprove) {
-                    // Only director1 & director2 can see the re-discussion button
-                    return $canApprove && in_array($user->role, ['director1', 'director2']);
-                })
-                ->requiresConfirmation()
-                ->modalHeading('Send to Re-discussion')
-                ->modalDescription('This will send the agreement overview back for further discussion.')
-                ->modalSubmitActionLabel('Send to Re-discussion')
-                ->form([
-                    Forms\Components\Textarea::make('comments')
-                        ->label('Discussion Points')
-                        ->rows(4)
-                        ->required()
-                        ->placeholder('Please specify what needs to be discussed or clarified...')
-                ])
-                ->action(function (array $data) use ($workflowService) {
-                    $workflowService->sendAgreementOverviewToRediscussion(
-                        $this->record, 
-                        auth()->user(), 
-                        $data['comments']
-                    );
-                    
-                    Notification::make()
-                        ->title('Sent to Re-discussion')
-                        ->body('The agreement overview has been sent for re-discussion.')
-                        ->info()
-                        ->send();
-                        
-                    return redirect()->route('filament.user.resources.pending-agreement-overviews.index');
-                }),
+            */
 
             Actions\Action::make('back_to_list')
                 ->label('Back to List')

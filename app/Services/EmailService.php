@@ -4,6 +4,7 @@
 namespace App\Services;
 
 use App\Models\Notification;
+use App\Mail\DocumentRequestMail;
 use Illuminate\Support\Facades\Mail;
 
 class EmailService
@@ -14,28 +15,34 @@ class EmailService
     public function sendNotificationEmail(Notification $notification)
     {
         try {
-            // Get recipient email from NIK or use default pattern
-            $recipientEmail = $this->getEmailFromNik($notification->recipient_nik);
-            
-            $emailData = [
-                'title' => $notification->title,
-                'message' => $notification->message,
-                'sender_name' => $notification->sender_name,
-                'recipient_name' => $notification->recipient_name,
-                'type' => $notification->type,
-                'created_at' => $notification->created_at
-            ];
+            \Log::info('📧 Sending markdown email', [
+                'notification_id' => $notification->id,
+                'related_type' => $notification->related_type,
+            ]);
 
-            Mail::send('emails.' . $this->getEmailTemplate($notification->type), $emailData, function ($message) use ($recipientEmail, $notification) {
-                $message->to($recipientEmail, $notification->recipient_name)
-                        ->subject($notification->title);
-            });
+            // ambil document
+            $document = $notification->related;
+
+            Mail::to('naylarizkadwifany@gmail.com')
+                ->send(new DocumentRequestMail($document, 'submit'));
 
             return true;
         } catch (\Exception $e) {
-            \Log::error('Failed to send email notification: ' . $e->getMessage());
+            \Log::error('❌ Failed to send markdown email', [
+                'notification_id' => $notification->id,
+                'error' => $e->getMessage(),
+            ]);
             return false;
         }
+    }
+
+    private function getTemplateForType(string $type): string
+    {
+        return match ($type) {
+            Notification::TYPE_APPROVAL_REQUEST => 'emails.document-request-created',
+            Notification::TYPE_DOCUMENT_COMPLETED => 'emails.document-request-completed',
+            default => 'emails.document-request-created', // fallback
+        };
     }
 
     /**

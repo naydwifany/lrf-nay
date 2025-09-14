@@ -18,6 +18,7 @@ use Filament\Infolists\Infolist;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Notifications\Notification;
+use Filament\Support\Enums\FontWeight;
 
 class AgreementOverviewResource extends Resource
 {
@@ -237,6 +238,8 @@ class AgreementOverviewResource extends Resource
 
             ->actions([
                 Tables\Actions\ViewAction::make(),
+                
+                /*  approve/reject/sendtorediscuss buttons move to below
                 Tables\Actions\Action::make('approve')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
@@ -339,6 +342,7 @@ class AgreementOverviewResource extends Resource
                             ->rows(3)
                             ->helperText('Optional: Add your comments for this rediscussion'),
                     ]),
+                */
                     
                 Tables\Actions\Action::make('download_pdf')
                     ->icon('heroicon-o-arrow-down-tray')
@@ -416,6 +420,76 @@ class AgreementOverviewResource extends Resource
                             ->columnSpanFull(),
                     ]),
 
+                // ATTACHMENTS - SELALU TAMPIL tanpa visible condition
+               Infolists\Components\Section::make('📎 Document Attachments')
+                    ->schema([
+                        Infolists\Components\Grid::make(2)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('documentRequest.dokumen_utama')
+                                    ->label('📄 Main Document')
+                                    ->formatStateUsing(function($state) {
+                                        if (!$state) return '❌ Not uploaded';
+                                        $filename = basename($state);
+                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                        return "📁 {$filename} ({$extension})";
+                                    })
+                                    ->url(fn ($record) => $record->documentRequest?->dokumen_utama ? asset('storage/' . $record->documentRequest->dokumen_utama) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'danger')
+                                    ->weight(FontWeight::Medium),
+
+                                Infolists\Components\TextEntry::make('documentRequest.akta_pendirian')
+                                    ->label('🏢 Akta Pendirian')
+                                    ->formatStateUsing(fn($state) => $state
+                                        ? "📁 " . basename($state) . " (" . strtoupper(pathinfo($state, PATHINFO_EXTENSION)) . ")"
+                                        : "➖ Not provided"
+                                    )
+                                    ->url(fn ($record) => $record->documentRequest?->akta_pendirian ? asset('storage/' . $record->documentRequest->akta_pendirian) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                
+                                Infolists\Components\TextEntry::make('documentRequest.ktp_direktur')
+                                    ->label('🆔 Director ID Card')
+                                    ->formatStateUsing(fn($state) => $state
+                                        ? "📁 " . basename($state) . " (" . strtoupper(pathinfo($state, PATHINFO_EXTENSION)) . ")"
+                                        : "➖ Not provided"
+                                    )
+                                    ->url(fn ($record) => $record->documentRequest?->ktp_direktur ? asset('storage/' . $record->documentRequest?->ktp_direktur) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                
+                                Infolists\Components\TextEntry::make('documentRequest.akta_perubahan')
+                                    ->label('📋 Akta Perubahan')
+                                    ->formatStateUsing(fn($state) => $state
+                                        ? "📁 " . basename($state) . " (" . strtoupper(pathinfo($state, PATHINFO_EXTENSION)) . ")"
+                                        : "➖ Not provided"
+                                    )
+                                    ->url(fn ($record) => $record->documentRequest?->akta_perubahan ? asset('storage/' . $record->documentRequest?->akta_perubahan) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                
+                                Infolists\Components\TextEntry::make('documentRequest.surat_kuasa')
+                                    ->label('✍️ Surat Kuasa')
+                                    ->formatStateUsing(fn($state) => $state
+                                        ? "📁 " . basename($state) . " (" . strtoupper(pathinfo($state, PATHINFO_EXTENSION)) . ")"
+                                        : "➖ Not provided"
+                                    )
+                                    ->url(fn ($record) => $record->documentRequest?->surat_kuasa ? asset('storage/' . $record->documentRequest?->surat_kuasa) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                
+                                Infolists\Components\TextEntry::make('documentRequest.nib')
+                                    ->label('🏪 NIB')
+                                    ->formatStateUsing(fn($state) => $state
+                                        ? "📁 " . basename($state) . " (" . strtoupper(pathinfo($state, PATHINFO_EXTENSION)) . ")"
+                                        : "➖ Not provided"
+                                    )
+                                    ->url(fn ($record) => $record->documentRequest?->nib ? asset('storage/' . $record->documentRequest?->nib) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                            ]),
+                    ]),
+
             // Workflow Steps Visual
             Infolists\Components\Section::make('Workflow Progress')
                 ->schema([
@@ -473,6 +547,122 @@ class AgreementOverviewResource extends Resource
                                 Infolists\Components\TextEntry::make('comments'),
                             ])
                             ->columns(5),
+                    ]),
+                    
+                // Enhanced Action Buttons
+                Infolists\Components\Section::make('🎯 Approval Actions')
+                    ->description('Review the Agreement Overview carefully and make your decision')
+                    ->schema([
+                        Infolists\Components\Actions::make([
+                            Infolists\Components\Actions\Action::make('approve')
+                                ->label('✅ Approve Document')
+                                ->icon('heroicon-o-check-circle')
+                                ->color('success')
+                                ->size('lg')
+                                ->visible(fn (AgreementOverview $record) =>
+                                    app(DocumentWorkflowService::class)
+                                        ->canUserApproveAgreementOverview(auth()->user(), $record)
+                                )
+                                ->form([
+                                    Forms\Components\Textarea::make('approval_comments')
+                                        ->label('Approval Comments')
+                                        ->rows(3)
+                                        ->helperText('Optional: Add your comments for this approval'),
+                                ])
+                                ->action(function (AgreementOverview $record, array $data) {
+                                    $workflowService = app(DocumentWorkflowService::class);
+
+                                    $workflowService->approveAgreementOverview(
+                                        $record,
+                                        auth()->user(),
+                                        $data['approval_comments'] ?? 'Approved'
+                                    );
+
+                                    Notification::make()
+                                        ->title('Agreement Overview Approved')
+                                        ->body('The Agreement Overview has been successfully approved.')
+                                        ->success()
+                                        ->send();
+                                })
+                                ->requiresConfirmation()
+                                ->modalHeading('✅ Approve Agreement Overview')
+                                ->modalDescription('Are you sure you want to approve this Agreement Overview?'),
+
+                            Infolists\Components\Actions\Action::make('reject')
+                                ->label('❌ Reject Document')
+                                ->icon('heroicon-o-x-circle')
+                                ->color('danger')
+                                ->size('lg')
+                                ->modalHeading('Reject Agreement Overview')
+                                ->modalDescription('Are you sure you want to reject this Agreement Overview?')
+                                ->modalSubmitActionLabel('Reject')
+                                ->visible(fn (AgreementOverview $record) =>
+                                    auth()->user()->role === 'director' &&
+                                    app(DocumentWorkflowService::class)
+                                        ->canUserApproveAgreementOverview(auth()->user(), $record)
+                                )
+                                ->action(function (AgreementOverview $record, array $data) {
+                                    $workflowService = app(DocumentWorkflowService::class);
+
+                                    $workflowService->rejectAgreementOverview(
+                                        $record,
+                                        auth()->user(),
+                                        $data['rejection_reason']
+                                    );
+
+                                    Notification::make()
+                                        ->title('Agreement Overview Rejected')
+                                        ->body('The agreement overview has been rejected and returned to the requester.')
+                                        ->danger()
+                                        ->send();
+                                })
+                                ->form([
+                                    Forms\Components\Textarea::make('rejection_reason')
+                                        ->label('Rejection Reason')
+                                        ->required()
+                                        ->rows(3)
+                                        ->helperText('Please provide a clear reason for rejection'),
+                                ])
+                                ->requiresConfirmation(),
+                              
+                            Infolists\Components\Actions\Action::make('send_to_rediscuss')
+                                ->label('↩ Send to Rediscuss')
+                                ->icon('heroicon-o-arrow-uturn-left')
+                                ->color('warning')
+                                ->size('lg')
+                                ->requiresConfirmation()
+                                ->modalHeading('Send Agreement Overview to Rediscussion')
+                                ->modalDescription('Are you sure you want to send this Agreement Overview back to discussion?')
+                                ->modalSubmitActionLabel('Send Back')
+                                ->visible(fn (AgreementOverview $record) =>
+                                    auth()->user()->role === 'director' &&
+                                    in_array($record->status, [
+                                        AgreementOverview::STATUS_PENDING_DIRECTOR1,
+                                        AgreementOverview::STATUS_PENDING_DIRECTOR2,
+                                    ])
+                                )
+                                ->action(function (AgreementOverview $record, array $data) {
+                                    $workflowService = app(DocumentWorkflowService::class);
+
+                                    $workflowService->sendAgreementOverviewToRediscussion(
+                            $record,
+                                        auth()->user(),
+                                        $data['rediscussion_comments'] ?? 'Sent back to discussion'
+                                    );
+
+                                    Notification::make()
+                                        ->title('Agreement Overview Sent Back')
+                                        ->body('The agreement overview has been sent back to forum discussion.')
+                                        ->warning()
+                                        ->send();
+                                })
+                                ->form([
+                                    Forms\Components\Textarea::make('rediscussion_comments')
+                                        ->label('Rediscussion Comments')
+                                        ->rows(3)
+                                        ->helperText('Optional: Add your comments for this rediscussion'),
+                                ]),
+                        ])->columnSpanFull(),
                     ]),
             ]);
     }

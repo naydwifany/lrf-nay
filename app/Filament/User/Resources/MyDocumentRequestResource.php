@@ -76,18 +76,19 @@ class MyDocumentRequestResource extends Resource
                         Forms\Components\TextInput::make('title')
                             ->required()
                             ->maxLength(255)
-                            ->label('Document Title'),
+                            ->label('Judul Dokumen (Nama Mitra)'),
                         Forms\Components\Select::make('tipe_dokumen')
                             ->relationship('doctype', 'document_name')
                             ->searchable()
                             ->preload()
                             ->required()
-                            ->label('Document Type'),
+                            ->label('Tipe Dokumen'),
                         Forms\Components\Textarea::make('description')
                             ->rows(3)
                             ->maxLength(1000)
-                            ->required()
-                            ->label('Document Description'),
+                            ->label('Deskripsi Perjanjian'),
+                        
+                        /*
                         Forms\Components\Select::make('priority')
                             ->options([
                                 'low' => 'Low',
@@ -99,9 +100,10 @@ class MyDocumentRequestResource extends Resource
                             ->required()
                             ->native(false)
                             ->label('Priority Level'),
-                        
+                        */
+                                                    
                             Forms\Components\Radio::make('doc_filter')
-                                ->label('Dokumen')
+                                ->label('Document')
                                 ->options([
                                     'review' => 'Review',
                                     'create' => 'Create'
@@ -121,85 +123,35 @@ class MyDocumentRequestResource extends Resource
                                 ->required(fn (callable $get) => $get('doc_filter') === 'review')
                                 ->helperText(fn (callable $get) => 
                                     $get('doc_filter') === 'review' 
-                                        ? '⚠️ Required: Main document must be uploaded for new document review' 
-                                        : '📎 Optional: Upload document if available for create'
+                                        ? '⚠️ Required: Main document harus disertakan saat memilih Document Review' 
+                                        : '📎 Optional: Main document tidak wajib disertakan saat memilih Document Create'
                                 )
-                                ->storeFile(),
-                    ])->columns(2),
+                                ->storeFile()
+                                ->getUploadedFileNameForStorageUsing(function ($file, $record, $get) {
+                                    $ext = $file->getClientOriginalExtension();
+                                    $nomor = $get('nomor_dokumen') ?? 'TEMP';
+                                    $safeNomor = str_replace('/', '-', $nomor);
 
-                Forms\Components\Section::make('Required Documents')
-                    ->schema([
-                        Grid::make()->columns(2)->schema([
-                            FileUpload::make('akta_pendirian')
-                                ->label('Akta Pendirian & SK')
-                                ->directory('documents')
-                                ->maxSize(5120)
-                                ->downloadable()
-                                ->required()
-                                ->previewable(true)
-                                ->openable(),
-                            FileUpload::make('ktp_direktur')
-                                ->label('Director ID Card')
-                                ->directory('documents')
-                                ->maxSize(5120)
-                                ->downloadable()
-                                ->previewable(true)
-                                ->openable(),
-                            FileUpload::make('akta_perubahan')
-                                ->label('Akta Perubahan & SK')
-                                ->directory('documents')
-                                ->maxSize(5120)
-                                ->downloadable()
-                                ->required()
-                                ->previewable(true)
-                                ->openable(),
-                            FileUpload::make('surat_kuasa')
-                                ->label('Surat Kuasa')
-                                ->directory('documents')
-                                ->maxSize(5120)
-                                ->downloadable()
-                                ->previewable(true)
-                                ->openable(),
-                            FileUpload::make('nib')
-                                ->label('NIB (Business License)')
-                                ->directory('documents')
-                                ->maxSize(5120)
-                                ->required()
-                                ->downloadable()
-                                ->previewable(true)
-                                ->openable(),
-                        ])
-                        ]),
+                                    return $safeNomor . '.dokumen-utama.' . $ext;
+                                })
+                    ])->columns(2),
 
                 Forms\Components\Section::make('Business Requirements')
                     ->schema([
                         Grid::make()->schema([
+                            /*
                             Forms\Components\RichEditor::make('data')
                                 ->label('Business Justification')
-                                ->required()
                                 ->columnSpanFull()
                                 ->helperText('Please explain why this document is needed for business purposes'),
+                            */
                             Forms\Components\TextInput::make('lama_perjanjian_surat')
-                                ->label('Contract Duration')
+                                ->label('Jangka Waktu Perjanjian')
                                 ->helperText('e.g., 12 Bulan, 2 Tahun'),
                         ])
                     ]),
 
-                Forms\Components\Section::make('Payment & Financial Terms')
-                    ->schema([
-                        Grid::make()->schema([
-                            Forms\Components\RichEditor::make('syarat_ketentuan_pembayaran')
-                                ->label('Terms & Conditions')
-                                ->required()
-                                ->columnSpanFull(),
-                            Forms\Components\RichEditor::make('pajak')
-                                ->label('Tax Considerations')
-                                ->required()
-                                ->columnSpanFull(),
-                        ])
-                        ]),
-
-                Forms\Components\Section::make('Rights & Obligations')
+                Forms\Components\Section::make('Hak & Kewajiban')
                     ->schema([
                         Grid::make()->schema([
                             Forms\Components\RichEditor::make('kewajiban_mitra')
@@ -221,14 +173,133 @@ class MyDocumentRequestResource extends Resource
                         ])
                     ]),
 
-                Forms\Components\Section::make('Additional Terms')
+                Forms\Components\Section::make('Regulasi Finansial')
+                    ->schema([
+                        Grid::make()->schema([
+                            Forms\Components\RichEditor::make('syarat_ketentuan_pembayaran')
+                                ->label('Syarat & Ketentuan Pembayaran (rincian lengkap)')
+                                ->required()
+                                ->columnSpanFull(),
+                            Forms\Components\RichEditor::make('pajak')
+                                ->label('Ketentuan Pajak')
+                                ->required()
+                                ->columnSpanFull(),
+                        ])
+                        ]),
+
+                Forms\Components\Section::make('Ketentuan Tambahan')
                     ->schema([
                         Grid::make()->schema([
                             Forms\Components\RichEditor::make('ketentuan_lain')
-                                ->label('Other Provisions')
+                                ->label('Ketentuan lain yang perlu dimasukkan ke dalam perjanjian')
                                 ->columnSpanFull(),
                         ])
                     ]),
+
+                Forms\Components\Section::make('Lampiran Dokumen')
+                    ->schema([
+                        Grid::make()->columns(2)->schema([
+                            FileUpload::make('akta_pendirian')
+                                ->label('Akta Pendirian & SK')
+                                ->directory('documents')
+                                ->maxSize(5120)
+                                ->downloadable()
+                                ->required()
+                                ->previewable(true)
+                                ->openable()
+                                ->getUploadedFileNameForStorageUsing(function ($file, $record, $get) {
+                                    $ext = $file->getClientOriginalExtension();
+
+                                    // ambil nomor_dokumen, jangan dari field upload ini
+                                    $nomor = $get('nomor_dokumen') ?? 'TEMP';
+                                    $safeNomor = str_replace('/', '-', $nomor);
+
+                                    return $safeNomor . '.akta-pendirian.' . $ext;
+                                }),
+                            FileUpload::make('akta_perubahan')
+                                ->label('Akta PT & SK Anggaran Dasar perubahan terakhir')
+                                ->directory('documents')
+                                ->maxSize(5120)
+                                ->downloadable()
+                                ->previewable(true)
+                                ->openable()
+                                ->getUploadedFileNameForStorageUsing(function ($file, $record, $get) {
+                                    $ext = $file->getClientOriginalExtension();
+
+                                    // ambil nomor_dokumen, jangan dari field upload ini
+                                    $nomor = $get('nomor_dokumen') ?? 'TEMP';
+                                    $safeNomor = str_replace('/', '-', $nomor);
+
+                                    return $safeNomor . '.akta-perubahan.' . $ext;
+                                }),
+                            FileUpload::make('npwp')
+                                ->label('NPWP (Nomor Pokok Wajib Pajak)')
+                                ->directory('documents')
+                                ->maxSize(5120)
+                                ->required()
+                                ->downloadable()
+                                ->previewable(true)
+                                ->openable()
+                                ->getUploadedFileNameForStorageUsing(function ($file, $record, $get) {
+                                    $ext = $file->getClientOriginalExtension();
+
+                                    // ambil nomor_dokumen, jangan dari field upload ini
+                                    $nomor = $get('nomor_dokumen') ?? 'TEMP';
+                                    $safeNomor = str_replace('/', '-', $nomor);
+
+                                    return $safeNomor . '.npwp.' . $ext;
+                                }),
+                            FileUpload::make('ktp_direktur')
+                                ->label('KTP kuasa Direksi (bila penandatangan bukan Direksi)')
+                                ->directory('documents')
+                                ->maxSize(5120)
+                                ->downloadable()
+                                ->previewable(true)
+                                ->openable()
+                                ->getUploadedFileNameForStorageUsing(function ($file, $record, $get) {
+                                    $ext = $file->getClientOriginalExtension();
+
+                                    // ambil nomor_dokumen, jangan dari field upload ini
+                                    $nomor = $get('nomor_dokumen') ?? 'TEMP';
+                                    $safeNomor = str_replace('/', '-', $nomor);
+
+                                    return $safeNomor . '.ktp-direktur.' . $ext;
+                                }),
+                            FileUpload::make('nib')
+                                ->label('NIB (Nomor Induk Berusaha)')
+                                ->directory('documents')
+                                ->maxSize(5120)
+                                ->required()
+                                ->downloadable()
+                                ->previewable(true)
+                                ->openable()
+                                ->getUploadedFileNameForStorageUsing(function ($file, $record, $get) {
+                                    $ext = $file->getClientOriginalExtension();
+
+                                    // ambil nomor_dokumen, jangan dari field upload ini
+                                    $nomor = $get('nomor_dokumen') ?? 'TEMP';
+                                    $safeNomor = str_replace('/', '-', $nomor);
+
+                                    return $safeNomor . '.nib.' . $ext;
+                                }),
+                            FileUpload::make('surat_kuasa')
+                                ->label('Surat kuasa Direksi (bila penandatangan bukan Direksi)')
+                                ->directory('documents')
+                                ->maxSize(5120)
+                                ->downloadable()
+                                ->previewable(true)
+                                ->openable()
+                                ->getUploadedFileNameForStorageUsing(function ($file, $record, $get) {
+                                    $ext = $file->getClientOriginalExtension();
+
+                                    // ambil nomor_dokumen, jangan dari field upload ini
+                                    $nomor = $get('nomor_dokumen') ?? 'TEMP';
+                                    $safeNomor = str_replace('/', '-', $nomor);
+
+                                    return $safeNomor . '.surat-kuasa.' . $ext;
+                                }),
+                        ])
+                        ]),
 
                 // Hidden fields - auto-filled from auth user
                 Forms\Components\Hidden::make('nik')
@@ -293,6 +364,8 @@ class MyDocumentRequestResource extends Resource
         'pending_legal' => 'Pending Legal',
         default => str_replace('_', ' ', ucwords($state))
     }),
+
+                /*
                 Tables\Columns\BadgeColumn::make('priority')
                     ->colors([
                         'success' => 'low',
@@ -300,6 +373,8 @@ class MyDocumentRequestResource extends Resource
                         'warning' => 'high',
                         'danger' => 'urgent',
                     ]),
+                */
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Created')
                     ->date()
@@ -309,11 +384,13 @@ class MyDocumentRequestResource extends Resource
                     ->dateTime()
                     ->placeholder('Not submitted')
                     ->sortable(),
+                /*
                 Tables\Columns\IconColumn::make('is_draft')
                     ->boolean()
                     ->label('Draft')
                     ->trueIcon('heroicon-o-pencil-square')
                     ->falseIcon('heroicon-o-paper-airplane'),
+                */
             ])
             ->filters([
                 SelectFilter::make('status')
@@ -327,6 +404,8 @@ class MyDocumentRequestResource extends Resource
                         'completed' => 'Completed',
                         'rejected' => 'Rejected',
                     ]),
+                
+                /*
                 SelectFilter::make('priority')
                     ->options([
                         'low' => 'Low',
@@ -334,6 +413,8 @@ class MyDocumentRequestResource extends Resource
                         'high' => 'High',
                         'urgent' => 'Urgent',
                     ]),
+                */
+
                 SelectFilter::make('tipe_dokumen')
                     ->relationship('doctype', 'document_name')
                     ->searchable()
@@ -403,7 +484,7 @@ class MyDocumentRequestResource extends Resource
                                 ->send();
                         }
                     }),
-                    // Ganti action create_agreement_overview dengan yang ini:
+                    
 
 // Tambahkan action ini di MyDocumentRequestResource table actions:
 
@@ -683,6 +764,7 @@ Tables\Actions\Action::make('create_agreement_overview')
                             ->send();
                     }), 
             ])
+            ->actionsAlignment('start')
             ->bulkActions([])
             ->defaultSort('created_at', 'desc')
             ->emptyStateHeading('No Document Requests')
@@ -780,6 +862,7 @@ public static function getDirector2Details($director2Selection): array
     {
         return $infolist
             ->schema([
+                /*
                 // DEBUG SECTION - Tampilkan semua data untuk cek
                 Infolists\Components\Section::make('🔍 Debug Info')
                     ->schema([
@@ -796,25 +879,29 @@ public static function getDirector2Details($director2Selection): array
                     ])
                     ->collapsible()
                     ->collapsed(),
+                */
 
                 Infolists\Components\Section::make('Document Overview')
                     ->schema([
                         Infolists\Components\TextEntry::make('nomor_dokumen')
-                            ->label('Document Number')
+                            ->label('Nomor Dokumen')
                             ->placeholder('Not assigned'),
                         Infolists\Components\TextEntry::make('title')
-                            ->label('Document Title'),
+                            ->label('Nama Mitra'),
                         Infolists\Components\TextEntry::make('doctype.document_name')
-                            ->label('Document Type')
+                            ->label('Tipe Dokumen')
                             ->badge(),
                         Infolists\Components\TextEntry::make('status')
                             ->badge(),
+                        /*
                         Infolists\Components\TextEntry::make('priority')
                             ->badge(),
+                            
                         Infolists\Components\IconEntry::make('is_draft')
                             ->boolean()
                             ->label('Draft Status'),
-                    ])->columns(3),
+                        */
+                    ])->columns(2),
 
                 Infolists\Components\Section::make('Requester Information')
                     ->schema([
@@ -832,34 +919,101 @@ public static function getDirector2Details($director2Selection): array
                             ->label('Directorate'),
                     ])->columns(3),
 
-                Infolists\Components\Section::make('Document Description')
+                Infolists\Components\Section::make('Informasi Dokumen')
                     ->schema([
+                        Infolists\Components\Grid::make(2)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('lama_perjanjian_surat')
+                                    ->label('⏰ Jangka Waktu Perjanjian')
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('doc_filter')
+                                    ->label('📑 Tipe Dokumen')
+                                    ->formatStateUsing(fn($state) => match($state) {
+                                        'review' => '🔍 Review',
+                                        'create' => '✨ Create New',
+                                        default => $state ?: 'Not specified'
+                                    })
+                                    ->badge(),
+                            ]),
                         Infolists\Components\TextEntry::make('description')
+                            ->label('📝 Deskripsi Dokumen')
                             ->html()
-                            ->columnSpanFull(),
+                            ->columnSpanFull()
+                            ->placeholder('Tidak ada deskripsi pada Document Request ini.'),
+                        /*
                         Infolists\Components\TextEntry::make('data')
                             ->label('Business Justification')
                             ->html()
                             ->columnSpanFull(),
+                        */
                     ]),
 
-                // ATTACHMENTS - SELALU TAMPIL tanpa visible condition
-                Infolists\Components\Section::make('📎 Document Attachments')
+                // HAK & KEWAJIBAN - SELALU TAMPIL
+                Infolists\Components\Section::make('⚖️ Hak & Kewajiban')
                     ->schema([
                         Infolists\Components\Grid::make(2)
                             ->schema([
-                                Infolists\Components\TextEntry::make('dokumen_utama')
-                                    ->label('📄 Main Document')
-                                    ->formatStateUsing(function($state) {
-                                        if (!$state) return '❌ Not uploaded';
-                                        $filename = basename($state);
-                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
-                                        return "📁 {$filename} ({$extension})";
-                                    })
-                                    ->url(fn ($record) => $record->dokumen_utama ? asset('storage/' . $record->dokumen_utama) : null)
-                                    ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'danger'),
-                                
+                                Infolists\Components\TextEntry::make('kewajiban_mitra')
+                                    ->label('📝 Kewajiban Mitra')
+                                    ->html()
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('hak_mitra')
+                                    ->label('✅ Hak Mitra')
+                                    ->html()
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('kewajiban_eci')
+                                    ->label('📝 Kewajiban ECI')
+                                    ->html()
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('hak_eci')
+                                    ->label('✅ Hak ECI')
+                                    ->html()
+                                    ->placeholder('Not specified'),
+                            ]),
+                    ]),
+
+                // CONTRACT TERMS - SELALU TAMPIL
+                Infolists\Components\Section::make('📋 Regulasi Finansial')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('syarat_ketentuan_pembayaran')
+                            ->label('💰 Syarat & Ketentuan Pembayaran')
+                            ->columnSpanFull()
+                            ->html()
+                            ->placeholder('Not specified'),
+                        Infolists\Components\TextEntry::make('pajak')
+                            ->label('📊 Ketentuan Pajak')
+                            ->columnSpanFull()
+                            ->html()
+                            ->placeholder('Not specified'),
+                    ]),
+
+                // ADDITIONAL TERMS - SELALU TAMPIL
+                Infolists\Components\Section::make('📄 Ketentuan Tambahan')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('ketentuan_lain')
+                            ->label('📋 Ketentuan Lainnya')
+                            ->columnSpanFull()
+                            ->html()
+                            ->placeholder('Tidak ada ketentuan tambahan.'),
+                    ]),
+
+                // ATTACHMENTS - SELALU TAMPIL tanpa visible condition
+                Infolists\Components\Section::make('📎 Lampiran Dokumen')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('dokumen_utama')
+                            ->label('📄 Main Document')
+                            ->formatStateUsing(function($state) {
+                                if (!$state) return '❌ Not uploaded';
+                                $filename = basename($state);
+                                $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                return "📁 {$filename} ({$extension})";
+                            })
+                            ->url(fn ($record) => $record->dokumen_utama ? asset('storage/' . $record->dokumen_utama) : null)
+                            ->openUrlInNewTab()
+                            ->color(fn($state) => $state ? 'success' : 'danger')
+                            ->tooltip(fn($state) => $state ? basename($state) : 'No file'),
+                        Infolists\Components\Grid::make(2)
+                            ->schema([                                
                                 Infolists\Components\TextEntry::make('akta_pendirian')
                                     ->label('🏢 Akta Pendirian')
                                     ->formatStateUsing(function($state) {
@@ -870,20 +1024,10 @@ public static function getDirector2Details($director2Selection): array
                                     })
                                     ->url(fn ($record) => $record->akta_pendirian ? asset('storage/' . $record->akta_pendirian) : null)
                                     ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
-                                
-                                Infolists\Components\TextEntry::make('ktp_direktur')
-                                    ->label('🆔 Director ID Card')
-                                    ->formatStateUsing(function($state) {
-                                        if (!$state) return '➖ Not provided';
-                                        $filename = basename($state);
-                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
-                                        return "📁 {$filename} ({$extension})";
-                                    })
-                                    ->url(fn ($record) => $record->ktp_direktur ? asset('storage/' . $record->ktp_direktur) : null)
-                                    ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
-                                
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->akta_pendirian), // full text muncul di hover
+
                                 Infolists\Components\TextEntry::make('akta_perubahan')
                                     ->label('📋 Akta Perubahan')
                                     ->formatStateUsing(function($state) {
@@ -894,22 +1038,40 @@ public static function getDirector2Details($director2Selection): array
                                     })
                                     ->url(fn ($record) => $record->akta_perubahan ? asset('storage/' . $record->akta_perubahan) : null)
                                     ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
-                                
-                                Infolists\Components\TextEntry::make('surat_kuasa')
-                                    ->label('✍️ Surat Kuasa')
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->akta_perubahan), // full text muncul di hover
+
+                                Infolists\Components\TextEntry::make('npwp')
+                                    ->label('📋 NPWP (Nomor Pokok Wajib Pajak)')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
                                         $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
                                         return "📁 {$filename} ({$extension})";
                                     })
-                                    ->url(fn ($record) => $record->surat_kuasa ? asset('storage/' . $record->surat_kuasa) : null)
+                                    ->url(fn ($record) => $record->npwp ? asset('storage/' . $record->npwp) : null)
                                     ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->npwp), // full text muncul di hover
                                 
+                                Infolists\Components\TextEntry::make('ktp_direktur')
+                                    ->label('🆔 KTP kuasa Direktur')
+                                    ->formatStateUsing(function($state) {
+                                        if (!$state) return '➖ Not provided';
+                                        $filename = basename($state);
+                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                        return "📁 {$filename} ({$extension})";
+                                    })
+                                    ->url(fn ($record) => $record->ktp_direktur ? asset('storage/' . $record->ktp_direktur) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->ktp_direktur), // full text muncul di hover
+
                                 Infolists\Components\TextEntry::make('nib')
-                                    ->label('🏪 NIB')
+                                    ->label('🏪 NIB (Nomor Induk Berusaha)')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -918,71 +1080,24 @@ public static function getDirector2Details($director2Selection): array
                                     })
                                     ->url(fn ($record) => $record->nib ? asset('storage/' . $record->nib) : null)
                                     ->openUrlInNewTab()
-                                    ->color(fn($state) => $state ? 'success' : 'gray'),
-                            ]),
-                    ]),
-
-                // CONTRACT TERMS - SELALU TAMPIL
-                Infolists\Components\Section::make('📋 Contract Terms & Conditions')
-                    ->schema([
-                        Infolists\Components\Grid::make(2)
-                            ->schema([
-                                Infolists\Components\TextEntry::make('lama_perjanjian_surat')
-                                    ->label('⏰ Contract Duration')
-                                    ->placeholder('Not specified'),
-                                Infolists\Components\TextEntry::make('doc_filter')
-                                    ->label('📑 Document Type')
-                                    ->formatStateUsing(fn($state) => match($state) {
-                                        'review' => '🔍 Review',
-                                        'create' => '✨ Create New',
-                                        default => $state ?: 'Not specified'
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->nib), // full text muncul di hover
+                                
+                                Infolists\Components\TextEntry::make('surat_kuasa')
+                                    ->label('✍️ Surat kuasa Direktur')
+                                    ->formatStateUsing(function($state) {
+                                        if (!$state) return '➖ Not provided';
+                                        $filename = basename($state);
+                                        $extension = strtoupper(pathinfo($filename, PATHINFO_EXTENSION));
+                                        return "📁 {$filename} ({$extension})";
                                     })
-                                    ->badge(),
+                                    ->url(fn ($record) => $record->surat_kuasa ? asset('storage/' . $record->surat_kuasa) : null)
+                                    ->openUrlInNewTab()
+                                    ->color(fn($state) => $state ? 'success' : 'gray')
+                                    ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
+                                    ->tooltip(fn ($record) => $record->surat_kuasa), // full text muncul di hover
                             ]),
-                        Infolists\Components\TextEntry::make('syarat_ketentuan_pembayaran')
-                            ->label('💰 Payment Terms & Conditions')
-                            ->columnSpanFull()
-                            ->html()
-                            ->placeholder('Not specified'),
-                        Infolists\Components\TextEntry::make('pajak')
-                            ->label('📊 Tax Considerations')
-                            ->columnSpanFull()
-                            ->html()
-                            ->placeholder('Not specified'),
-                    ]),
-
-                // RIGHTS & OBLIGATIONS - SELALU TAMPIL
-                Infolists\Components\Section::make('⚖️ Rights & Obligations')
-                    ->schema([
-                        Infolists\Components\Grid::make(2)
-                            ->schema([
-                                Infolists\Components\TextEntry::make('kewajiban_mitra')
-                                    ->label('📝 Partner Obligations')
-                                    ->html()
-                                    ->placeholder('Not specified'),
-                                Infolists\Components\TextEntry::make('hak_mitra')
-                                    ->label('✅ Partner Rights')
-                                    ->html()
-                                    ->placeholder('Not specified'),
-                                Infolists\Components\TextEntry::make('kewajiban_eci')
-                                    ->label('📝 ECI Obligations')
-                                    ->html()
-                                    ->placeholder('Not specified'),
-                                Infolists\Components\TextEntry::make('hak_eci')
-                                    ->label('✅ ECI Rights')
-                                    ->html()
-                                    ->placeholder('Not specified'),
-                            ]),
-                    ]),
-
-                // ADDITIONAL TERMS - SELALU TAMPIL
-                Infolists\Components\Section::make('📄 Additional Terms')
-                    ->schema([
-                        Infolists\Components\TextEntry::make('ketentuan_lain')
-                            ->label('📋 Other Provisions')
-                            ->columnSpanFull()
-                            ->html()
-                            ->placeholder('No additional terms specified'),
                     ]),
 
                 Infolists\Components\Section::make('Timeline')
