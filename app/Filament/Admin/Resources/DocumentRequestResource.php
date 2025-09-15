@@ -1490,51 +1490,64 @@ Infolists\Components\Section::make('Discussion Forum')
 
                 Infolists\Components\Section::make('📊 Approval History')
                     ->schema([
-                        Infolists\Components\RepeatableEntry::make('approvals')
+                        Infolists\Components\RepeatableEntry::make('approvalHistory')
+                            ->getStateUsing(fn ($record) => $record->approvalHistory())
                             ->schema([
-                                Infolists\Components\TextEntry::make('approver.name')
-                                    ->label('👤 Approver')
+                                Infolists\Components\TextEntry::make('name')
+                                    ->label('👤 By')
                                     ->placeholder('Unknown')
                                     ->weight(FontWeight::Medium),
-                                    
-                                Infolists\Components\TextEntry::make('approval_type')
+
+                                Infolists\Components\TextEntry::make('role')
                                     ->label('🏷️ Role')
-                                    ->formatStateUsing(fn($state) => match($state) {
-                                        'supervisor' => '👨‍💼 Supervisor',
-                                        'general_manager' => '🎯 General Manager',
-                                        'admin_legal' => '⚖️ Legal Admin',
-                                        'head_legal' => '👩‍⚖️ Head Legal',
-                                        'head_finance' => '💰 Head Finance',
-                                        'director' => '👔 Director',
-                                        default => ucfirst(str_replace('_', ' ', $state))
+                                    ->formatStateUsing(fn($state, $record) => match($record['type']) {
+                                        'approval' => match($state) {
+                                            'supervisor'      => '👨‍💼 Supervisor',
+                                            'general_manager' => '🎯 General Manager',
+                                            'admin_legal'     => '⚖️ Legal Admin',
+                                            'head_legal'      => '👩‍⚖️ Head Legal',
+                                            'head_finance'    => '💰 Head Finance',
+                                            'director'        => '👔 Director',
+                                            default           => ucfirst(str_replace('_', ' ', $state)),
+                                        },
+                                        'closure' => '🛑 Forum Closed',
+                                        default   => ucfirst((string) $state),
                                     })
                                     ->badge()
                                     ->color('info'),
-                                    
+
                                 Infolists\Components\TextEntry::make('status')
                                     ->label('📋 Status')
                                     ->badge()
-                                    ->color(fn($state) => match($state) {
-                                        'pending' => 'warning',
-                                        'approved' => 'success',
-                                        'rejected' => 'danger',
-                                        default => 'gray'
+                                    ->color(fn($state, $record) => match($record['type']) {
+                                        'approval' => match($state) {
+                                            'pending'  => 'warning',
+                                            'approved' => 'success',
+                                            'rejected' => 'danger',
+                                            default    => 'gray',
+                                        },
+                                        'closure' => 'danger',
+                                        default   => 'gray',
                                     })
-                                    ->formatStateUsing(fn($state) => match($state) {
-                                        'pending' => '⏳ Pending',
-                                        'approved' => '✅ Approved',
-                                        'rejected' => '❌ Rejected',
-                                        default => ucfirst($state)
+                                    ->formatStateUsing(fn($state, $record) => match($record['type']) {
+                                        'approval' => match($state) {
+                                            'pending'  => '⏳ Pending',
+                                            'approved' => '✅ Approved',
+                                            'rejected' => '❌ Rejected',
+                                            default    => ucfirst((string) $state),
+                                        },
+                                        'closure' => '🔒 Forum Closed',
+                                        default   => ucfirst((string) $state),
                                     }),
-                                    
-                                Infolists\Components\TextEntry::make('approved_at')
+
+                                Infolists\Components\TextEntry::make('date')
                                     ->label('📅 Date')
                                     ->dateTime()
                                     ->since()
                                     ->placeholder('⏳ Pending'),
-                                    
+
                                 Infolists\Components\TextEntry::make('comments')
-                                    ->label('💬 Comments')
+                                    ->label('💬 Comments / Notes')
                                     ->placeholder('No comments')
                                     ->limit(100)
                                     ->tooltip(fn($state) => $state),
@@ -1542,7 +1555,7 @@ Infolists\Components\Section::make('Discussion Forum')
                             ->columns(5)
                             ->columnSpanFull(),
                     ])
-                    ->visible(fn($record) => $record->approvals()->count() > 0),
+                    ->visible(fn($record) => $record->approvalHistory()->count() > 0),
                 
                 // Enhanced Action Buttons
                 Infolists\Components\Section::make('🎯 Approval Actions')

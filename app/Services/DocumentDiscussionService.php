@@ -199,7 +199,7 @@ class DocumentDiscussionService
         }
     }
 
-    public function closeDiscussion(DocumentRequest $documentRequest, User $user, string $reason = null): DocumentComment {
+    public function closeDiscussion(DocumentRequest $documentRequest, User $user, string $reason = null, ?string $notes = null): DocumentComment {
         if ($user->role !== 'head_legal') {
             throw new \Exception('Only Head Legal can close the discussion.');
         }

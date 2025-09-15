@@ -383,4 +383,37 @@ public function canCloseDiscussion(?User $user = null): bool
         return app(\App\Services\DocumentWorkflowService::class)
             ->getDocumentStatus($this);
     }
+
+    public function approvalHistory()
+    {
+        // Ambil approvals
+        $approvals = $this->approvals()->get()->map(function ($a) {
+            return [
+                'type' => 'approval',
+                'role' => $a->approval_type,
+                'name' => $a->approver?->name ?? $a->approver_nik,
+                'status' => $a->status,
+                'date' => $a->approved_at ?? $a->created_at,
+                'comments' => $a->comments,
+            ];
+        });
+
+        // Ambil closure events
+        $closures = $this->comments()
+            ->where('is_forum_closed', true)
+            ->get()
+            ->map(function ($c) {
+                return [
+                    'type' => 'closure',
+                    'role' => $c->user_role,
+                    'name' => $c->user_name ?? $c->user_nik,
+                    'status' => 'discussion_closed',
+                    'date' => $c->forum_closed_at ?? $c->created_at,
+                    'comments' => $c->comment,
+                ];
+            });
+
+        // Gabungkan dan urutkan berdasarkan tanggal
+        return $approvals->merge($closures)->sortBy('date')->values();
+    }
 }
