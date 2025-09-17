@@ -1,5 +1,5 @@
 <?php
-namespace App\Filament\Admin\Resources\AgreementOverviewResource\Pages;
+namespace App\Filament\Admin\Resources\DocumentRequestResource\Pages\AgreementOverviews;
 
 use App\Filament\Admin\Resources\AgreementOverviewResource;
 use Filament\Resources\Pages\CreateRecord;

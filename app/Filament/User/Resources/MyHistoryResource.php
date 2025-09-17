@@ -439,7 +439,7 @@ class MyHistoryResource extends Resource
                                     ->placeholder('Not specified'),
                             ]),
                     ])
-                    ->collapsible(),,
+                    ->collapsible(),
 
                 // CONTRACT TERMS - SELALU TAMPIL
                 Infolists\Components\Section::make('📋 Regulasi Finansial')
@@ -455,7 +455,7 @@ class MyHistoryResource extends Resource
                             ->html()
                             ->placeholder('Not specified'),
                     ])
-                    ->collapsible(),,
+                    ->collapsible(),
 
                 // ADDITIONAL TERMS - SELALU TAMPIL
                 Infolists\Components\Section::make('📄 Ketentuan Tambahan')
@@ -614,7 +614,7 @@ class MyHistoryResource extends Resource
                                 Infolists\Components\TextEntry::make('approved_at')
                                     ->label('Date')
                                     ->dateTime()
-                                    ->formatStateUsing(fn ($state) => $state ? $state->diffForHumans() : 'Pending'),,
+                                    ->formatStateUsing(fn ($state) => $state ? $state->diffForHumans() : 'Pending'),
                                 Infolists\Components\TextEntry::make('comments')
                                     ->label('Comments')
                                     ->placeholder('No comments')
