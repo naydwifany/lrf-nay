@@ -1,9 +1,9 @@
 <?php
 // app/Filament/User/Resources/PendingAgreementOverviewResource/Pages/ViewPendingAgreementOverview.php
 
-namespace App\Filament\User\Resources\PendingAgreementOverviewResource\Pages;
+namespace App\Filament\User\Resources\MyApprovalResource\Pages\PendingAgreementOverviews;
 
-use App\Filament\User\Resources\PendingAgreementOverviewResource;
+use App\Filament\User\Resources\MyApprovalResource;
 use App\Services\DocumentWorkflowService;
 use Filament\Actions;
 use Filament\Forms;
@@ -12,7 +12,7 @@ use Filament\Notifications\Notification;
 
 class ViewPendingAgreementOverview extends ViewRecord
 {
-    protected static string $resource = PendingAgreementOverviewResource::class;
+    protected static string $resource = MyApprovalResource::class;
 
     protected function getHeaderActions(): array
     {

@@ -99,11 +99,12 @@ class DiscussionResource extends Resource
                     ->sortable(),
                     
                 Tables\Columns\TextColumn::make('nomor_dokumen')
-                    ->label('Document Number')
+                    ->label('No. Dokumen')
                     ->searchable()
                     ->placeholder('Not assigned'),
                     
                 Tables\Columns\TextColumn::make('title')
+                    ->label('Nama Mitra')
                     ->searchable()
                     ->sortable()
                     ->limit(50),
@@ -117,7 +118,7 @@ class DiscussionResource extends Resource
                     ->color('info'),
                     
                 Tables\Columns\TextColumn::make('doctype.document_name')
-                    ->label('Document Type')
+                    ->label('Jenis Perjanjian')
                     ->badge()
                     ->default('No Type'),
                     
@@ -159,15 +160,15 @@ class DiscussionResource extends Resource
                     ->trueColor('danger')
                     ->falseColor('success'),
                     
-                Tables\Columns\TextColumn::make('created_at')
-                    ->label('Created')
+                Tables\Columns\TextColumn::make('submitted_at')
+                    ->label('Diunggah')
                     ->dateTime()
                     ->sortable(),
             ])
             ->filters([
                 SelectFilter::make('status')
                     ->options([
-                        'discussion' => 'Discussion',
+                        'discussion' => 'Closed Discussion',
                         'in_discussion' => 'In Discussion',
                     ]),
                     
@@ -190,9 +191,14 @@ class DiscussionResource extends Resource
                     }),
             ])
             ->actions([
+                Tables\Actions\Action::make('view_history')
+                    ->label('View Document Detail')
+                    ->icon('heroicon-o-eye')
+                    ->url(fn ($record) => MyHistoryResource::getUrl('view', ['record' => $record])),
+
                 Tables\Actions\ViewAction::make()
                     ->label('View Discussion')
-                    ->icon('heroicon-o-eye'),
+                    ->icon('heroicon-o-chat-bubble-left-right'),
                     
                 Tables\Actions\Action::make('close_discussion')
                     ->icon('heroicon-o-lock-closed')

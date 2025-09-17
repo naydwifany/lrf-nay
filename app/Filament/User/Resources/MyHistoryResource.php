@@ -47,23 +47,28 @@ class MyHistoryResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('submitted_at')
+                    ->label('Diunggah')
+                    ->dateTime('M d, Y H:i')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('nomor_dokumen')
-                    ->label('Document Number')
+                    ->label('Nomor Dokumen')
                     ->searchable()
                     ->placeholder('Not assigned'),
                 Tables\Columns\TextColumn::make('title')
+                    ->label('Nama Mitra')
                     ->searchable()
                     ->sortable()
                     ->limit(40),
                 Tables\Columns\TextColumn::make('nama')
-                    ->label('Requester')
+                    ->label('PIC')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('divisi')
-                    ->label('Division')
+                Tables\Columns\TextColumn::make('dept')
+                    ->label('Departemen')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('doctype.document_name')
-                    ->label('Document Type')
+                    ->label('Jenis Perjanjian')
                     ->badge()
                     ->color('primary'),
                 Tables\Columns\BadgeColumn::make('decision')
@@ -128,12 +133,8 @@ class MyHistoryResource extends Resource
                             default                => 'You haven\'t been involved yet',
                         };
                     }),
-                Tables\Columns\TextColumn::make('submitted_at')
-                    ->label('Submitted')
-                    ->dateTime()
-                    ->sortable(),
                 Tables\Columns\TextColumn::make('completed_at')
-                    ->label('Completed')
+                    ->label('Completed at')
                     ->sortable()
                     ->getStateUsing(function ($record) {
                         // Pakai completed_at kalau ada, kalau null pakai status fallback
@@ -202,7 +203,8 @@ class MyHistoryResource extends Resource
                                 $docReqQuery->whereIn('status', $data['statuses']);
                             });
                         });
-                    }),
+                    })
+                    ->native(false),
                 Filter::make('decision')
                     ->label('Your Decision')
                     ->form([
@@ -224,17 +226,20 @@ class MyHistoryResource extends Resource
                             $approvalQuery->where('approver_nik', $userNik)
                                 ->where('status', $data['decisions']);
                         });
-                    }),
+                    })
+                    ->native(false),
                 SelectFilter::make('tipe_dokumen')
+                    ->label('Jenis Perjanjian')
                     ->relationship('doctype', 'document_name')
                     ->searchable()
                     ->preload()
                     ->multiple(),
-                SelectFilter::make('divisi')
+                SelectFilter::make('dept')
+                    ->label('Departemen')
                     ->options(function () {
-                        return DocumentRequest::whereNotNull('divisi')
+                        return DocumentRequest::whereNotNull('dept')
                             ->distinct()
-                            ->pluck('divisi', 'divisi')
+                            ->pluck('dept', 'dept')
                             ->filter()
                             ->toArray();
                     })
@@ -243,9 +248,9 @@ class MyHistoryResource extends Resource
                 Filter::make('submitted_at')
                     ->form([
                         DatePicker::make('submitted_from')
-                            ->label('Submitted From'),
+                            ->label('Diunggah Sejak'),
                         DatePicker::make('submitted_until')
-                            ->label('Submitted Until'),
+                            ->label('Diunggah Sampai'),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         return $query
@@ -257,28 +262,20 @@ class MyHistoryResource extends Resource
                                 $data['submitted_until'],
                                 fn (Builder $query, $date): Builder => $query->whereDate('submitted_at', '<=', $date),
                             );
-                    }),
+                    })
+                    ->native(false),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\Action::make('view_agreement')
-                    ->label('View AO')
-                    ->icon('heroicon-o-document-duplicate')
-                    ->color('info')
-                    ->visible(fn($record) => $record->agreementOverview !== null)
-                    ->url(fn ($record) => \App\Filament\User\Resources\PendingAgreementOverviewResource::getUrl(
-                        'view',
-                        ['record' => $record->agreementOverview->getKey()]
-                    )),
-                /* MASIH ERROR :(
+                Tables\Actions\ViewAction::make()
+                    ->label('View'),
                 Tables\Actions\Action::make('view_discussion')
                     ->label('View Discussion')
                     ->icon('heroicon-o-chat-bubble-left-right')
                     ->color('primary')
                     ->visible(fn($record) => in_array($record->status, ['in_discussion', 'agreement_creation']))
-                    ->url(fn($record) => static::getUrl('discussion', ['record' => $record])),
-                */
+                    ->url(fn ($record) => DiscussionResource::getUrl('view', ['record' => $record])),
                 Tables\Actions\Action::make('download_documents')
+                    ->label('Download LRF')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('success')
                     ->visible(fn($record) => $record->status === 'completed')
@@ -286,12 +283,21 @@ class MyHistoryResource extends Resource
                         // Generate ZIP with all documents
                         return response()->download(storage_path('app/documents/' . $record->id . '_complete.zip'));
                     }),
+                Tables\Actions\Action::make('view_agreement')
+                    ->label('Download AO')
+                    ->icon('heroicon-o-document-duplicate')
+                    ->color('info')
+                    ->visible(fn($record) => $record->agreementOverview !== null)
+                    ->url(fn ($record) => \App\Filament\User\Resources\PendingAgreementOverviewResource::getUrl(
+                        'view',
+                        ['record' => $record->agreementOverview->getKey()]
+                    )),
             ])
             ->actionsAlignment('start')
             ->bulkActions([])
             ->defaultSort('completed_at', 'desc')
             ->emptyStateHeading('No Document History')
-            ->emptyStateDescription('Your completed and rejected documents will appear here.')
+            ->emptyStateDescription('Your approved and rejected documents will appear here.')
             ->emptyStateIcon('heroicon-o-clock');
     }
 
@@ -310,7 +316,7 @@ class MyHistoryResource extends Resource
                             ->label('Nama Mitra')
                             ->weight(FontWeight::Medium), 
                         Infolists\Components\TextEntry::make('doctype.document_name')
-                            ->label('Tipe Dokumen')
+                            ->label('Jenis Perjanjian')
                             ->badge()
                             ->color('info'),
                         Infolists\Components\TextEntry::make('computed_status')
@@ -364,17 +370,14 @@ class MyHistoryResource extends Resource
                         Infolists\Components\Grid::make(3)
                             ->schema([
                                 Infolists\Components\TextEntry::make('nama')
-                                    ->label('Requester Name')
+                                    ->label('PIC')
                                     ->weight(FontWeight::Medium)
                                     ->color('primary'),
                                 Infolists\Components\TextEntry::make('nik')
-                                    ->label('Employee ID (NIK)')
+                                    ->label('NIK')
                                     ->copyable(),
                                 Infolists\Components\TextEntry::make('jabatan')
                                     ->label('Position'),
-                            ]),
-                        Infolists\Components\Grid::make(3)
-                            ->schema([
                                 Infolists\Components\TextEntry::make('divisi')
                                     ->label('Division'),
                                 Infolists\Components\TextEntry::make('dept')
@@ -392,7 +395,7 @@ class MyHistoryResource extends Resource
                                     ->label('⏰ Jangka Waktu Perjanjian')
                                     ->placeholder('Not specified'),
                                 Infolists\Components\TextEntry::make('doc_filter')
-                                    ->label('📑 Tipe Dokumen')
+                                    ->label('📑 Document')
                                     ->formatStateUsing(fn($state) => match($state) {
                                         'review' => '🔍 Review',
                                         'create' => '✨ Create New',
@@ -400,12 +403,12 @@ class MyHistoryResource extends Resource
                                     })
                                     ->badge(),
                             ]),
+                        /*
                         Infolists\Components\TextEntry::make('description')
                             ->label('📝 Deskripsi Dokumen')
                             ->html()
                             ->columnSpanFull()
                             ->placeholder('Tidak ada deskripsi pada Document Request ini.'),
-                        /*
                         Infolists\Components\TextEntry::make('data')
                             ->label('Business Justification')
                             ->html()
@@ -422,12 +425,12 @@ class MyHistoryResource extends Resource
                                     ->label('📝 Kewajiban Mitra')
                                     ->html()
                                     ->placeholder('Not specified'),
-                                Infolists\Components\TextEntry::make('hak_mitra')
-                                    ->label('✅ Hak Mitra')
-                                    ->html()
-                                    ->placeholder('Not specified'),
                                 Infolists\Components\TextEntry::make('kewajiban_eci')
                                     ->label('📝 Kewajiban ECI')
+                                    ->html()
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('hak_mitra')
+                                    ->label('✅ Hak Mitra')
                                     ->html()
                                     ->placeholder('Not specified'),
                                 Infolists\Components\TextEntry::make('hak_eci')
@@ -435,7 +438,8 @@ class MyHistoryResource extends Resource
                                     ->html()
                                     ->placeholder('Not specified'),
                             ]),
-                    ]),
+                    ])
+                    ->collapsible(),,
 
                 // CONTRACT TERMS - SELALU TAMPIL
                 Infolists\Components\Section::make('📋 Regulasi Finansial')
@@ -450,7 +454,8 @@ class MyHistoryResource extends Resource
                             ->columnSpanFull()
                             ->html()
                             ->placeholder('Not specified'),
-                    ]),
+                    ])
+                    ->collapsible(),,
 
                 // ADDITIONAL TERMS - SELALU TAMPIL
                 Infolists\Components\Section::make('📄 Ketentuan Tambahan')
@@ -460,11 +465,12 @@ class MyHistoryResource extends Resource
                             ->columnSpanFull()
                             ->html()
                             ->formatStateUsing(fn($state) => $state ?: '<span class="text-gray-500">Tidak ada ketentuan tambahan.</span>')
-                    ]),
+                    ])
+                    ->collapsible(),
 
                 // ATTACHMENTS - SELALU TAMPIL tanpa visible condition
                 Infolists\Components\Section::make('📎 Lampiran Dokumen')
-                    ->schema([
+                    ->schema([                               
                         Infolists\Components\TextEntry::make('dokumen_utama')
                             ->label('📄 Main Document')
                             ->formatStateUsing(function($state) {
@@ -480,7 +486,7 @@ class MyHistoryResource extends Resource
                         Infolists\Components\Grid::make(2)
                             ->schema([                                
                                 Infolists\Components\TextEntry::make('akta_pendirian')
-                                    ->label('🏢 Akta Pendirian')
+                                    ->label('🏢 Akta Pendirian + SK')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -494,7 +500,7 @@ class MyHistoryResource extends Resource
                                     ->tooltip(fn ($record) => $record->akta_pendirian), // full text muncul di hover
 
                                 Infolists\Components\TextEntry::make('akta_perubahan')
-                                    ->label('📋 Akta Perubahan')
+                                    ->label('📋 Akta PT & SK Anggaran Dasar perubahan terakhir')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -522,7 +528,7 @@ class MyHistoryResource extends Resource
                                     ->tooltip(fn ($record) => $record->npwp), // full text muncul di hover
                                 
                                 Infolists\Components\TextEntry::make('ktp_direktur')
-                                    ->label('🆔 KTP kuasa Direktur')
+                                    ->label('🆔 KTP kuasa Direksi (bila penandatangan bukan Direksi)')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -550,7 +556,7 @@ class MyHistoryResource extends Resource
                                     ->tooltip(fn ($record) => $record->nib), // full text muncul di hover
                                 
                                 Infolists\Components\TextEntry::make('surat_kuasa')
-                                    ->label('✍️ Surat kuasa Direktur')
+                                    ->label('✍️ Surat kuasa Direksi (bila penandatangan bukan Direksi)')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -563,32 +569,33 @@ class MyHistoryResource extends Resource
                                     ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
                                     ->tooltip(fn ($record) => $record->surat_kuasa), // full text muncul di hover
                             ]),
-                    ]),
+                    ])
+                    ->collapsible(),
 
-                Infolists\Components\Section::make('Timeline')
+                Infolists\Components\Section::make('⏱️ Timeline & Progress')
                     ->schema([
                         Infolists\Components\TextEntry::make('created_at')
-                            ->label('Created')
+                            ->label('Dibuat')
                             ->dateTime(),
                         Infolists\Components\TextEntry::make('submitted_at')
-                            ->label('Submitted')
+                            ->label('DIunggah')
                             ->dateTime(),
                         Infolists\Components\TextEntry::make('completed_at')
-                            ->label('Completed')
+                            ->label('Selesai')
                             ->formatStateUsing(function ($state) {
                                 if (empty($state)) {
-                                    return 'Not completed'; // placeholder manual
+                                    return 'Dalam proses'; // placeholder manual
                                 }
 
                                 return \Carbon\Carbon::parse($state)->format('d M Y H:i');
                             }),
                         Infolists\Components\TextEntry::make('total_processing_time')
-                            ->label('Total Processing Time')
+                            ->label('Jumlah Waktu Proses')
                             ->getStateUsing(function ($record) {
                                 if ($record->submitted_at && $record->completed_at) {
                                     return $record->submitted_at->diffForHumans($record->completed_at, true);
                                 }
-                                return 'Still on progress';
+                                return 'Dalam proses';
                             }),
                     ])->columns(4),
 
@@ -599,22 +606,25 @@ class MyHistoryResource extends Resource
                                 Infolists\Components\TextEntry::make('approver_name')
                                     ->label('Approver'),
                                 Infolists\Components\TextEntry::make('approval_type')
-                                    ->label('Type')
+                                    ->label('Role')
                                     ->getStateUsing(fn($record) => $record->getApprovalTypeLabel()),
                                 Infolists\Components\TextEntry::make('status')
                                     ->badge()
                                     ->color(fn($record) => $record->getStatusBadgeColor()),
                                 Infolists\Components\TextEntry::make('approved_at')
                                     ->label('Date')
-                                    ->dateTime(),
+                                    ->dateTime()
+                                    ->formatStateUsing(fn ($state) => $state ? $state->diffForHumans() : 'Pending'),,
                                 Infolists\Components\TextEntry::make('comments')
                                     ->label('Comments')
-                                    ->placeholder('No comments'),
+                                    ->placeholder('No comments')
+                                    ->formatStateUsing(fn ($state) => $state ?: 'No comments'),
                             ])
                             ->columns(5),
                     ]),
 
-                Infolists\Components\Section::make('Related Agreement')
+                // INI GANTI KE VIEW AO PDF
+                Infolists\Components\Section::make('Related Agreement Overview')
                     ->schema([
                         /*
                         Infolists\Components\TextEntry::make('agreementOverview.nomor_dokumen')

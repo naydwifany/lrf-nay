@@ -46,279 +46,24 @@ class DocumentRequestResource extends Resource
         return $pendingCount > 0 ? (string) $pendingCount : null;
     }
 
-    public static function form(Form $form): Form
-    {
-        return $form
-            ->schema([
-                Forms\Components\Wizard::make([
-                    Forms\Components\Wizard\Step::make('Document Information')
-                        ->icon('heroicon-o-document-text')
-                        ->schema([
-                            Forms\Components\Section::make('📄 Basic Document Details')
-                                ->schema([
-                                    Forms\Components\Grid::make(3)
-                                        ->schema([
-                                            Forms\Components\TextInput::make('nomor_dokumen')
-                                                ->label('Document Number')
-                                                ->placeholder('Auto-generated after submission')
-                                                ->disabled()
-                                                ->dehydrated(false),
-                                            Forms\Components\TextInput::make('title')
-                                                ->label('Document Title')
-                                                ->required()
-                                                ->maxLength(255)
-                                                ->columnSpan(2)
-                                                ->placeholder('Enter a descriptive title for your document'),
-                                        ]),
-                                    Forms\Components\Grid::make(3)
-                                        ->schema([
-                                            Forms\Components\Select::make('tipe_dokumen')
-                                                ->relationship('doctype', 'document_name')
-                                                ->searchable()
-                                                ->preload()
-                                                ->required()
-                                                ->label('Document Type')
-                                                ->placeholder('Select document type'),
-                                            /* priority field is unnecessary
-                                            Forms\Components\Select::make('priority')
-                                                ->options([
-                                                    'low' => 'Low',
-                                                    'medium' => 'Medium',
-                                                    'high' => 'High',
-                                                    'urgent' => 'Urgent',
-                                                ])
-                                                ->default('medium')
-                                                ->required()
-                                                ->native(false)
-                                                ->label('Priority Level'),
-                                            */
-                                            Forms\Components\Select::make('doc_filter')
-                                                ->label('Document Action')
-                                                ->options([
-                                                    'review' => 'Review Existing Document',
-                                                    'create' => 'Create New Document'
-                                                ])
-                                                ->default('create')
-                                                ->required()
-                                                ->native(false),
-                                        ]),
-                                    Forms\Components\Textarea::make('description')
-                                        ->label('Document Description')
-                                        ->rows(4)
-                                        ->maxLength(1000)
-                                        ->required()
-                                        ->placeholder('Provide a clear description of the document purpose and scope')
-                                        ->columnSpanFull(),
-                                ]),
-                        ]),
-
-                    Forms\Components\Wizard\Step::make('Requester Information')
-                        ->icon('heroicon-o-user')
-                        ->schema([
-                            Forms\Components\Section::make('👤 Personal Information')
-                                ->schema([
-                                    Forms\Components\Grid::make(3)
-                                        ->schema([
-                                            Forms\Components\TextInput::make('nik')
-                                                ->label('Employee ID (NIK)')
-                                                ->required()
-                                                ->maxLength(50)
-                                                ->default(fn() => auth()->user()->nik ?? '')
-                                                ->placeholder('Enter your employee ID'),
-                                            Forms\Components\TextInput::make('nama')
-                                                ->label('Full Name')
-                                                ->required()
-                                                ->maxLength(255)
-                                                ->default(fn() => auth()->user()->name ?? '')
-                                                ->placeholder('Enter your full name'),
-                                            Forms\Components\TextInput::make('jabatan')
-                                                ->label('Position/Job Title')
-                                                ->maxLength(255)
-                                                ->placeholder('Your current position'),
-                                        ]),
-                                ]),
-                            Forms\Components\Section::make('🏢 Organizational Information')
-                                ->schema([
-                                    Forms\Components\Grid::make(3)
-                                        ->schema([
-                                            Forms\Components\TextInput::make('divisi')
-                                                ->label('Division')
-                                                ->maxLength(255)
-                                                ->placeholder('Your division'),
-                                            Forms\Components\TextInput::make('dept')
-                                                ->label('Department')
-                                                ->maxLength(255)
-                                                ->placeholder('Your department'),
-                                            Forms\Components\TextInput::make('direktorat')
-                                                ->label('Directorate')
-                                                ->maxLength(255)
-                                                ->placeholder('Your directorate'),
-                                        ]),
-                                    Forms\Components\TextInput::make('nik_atasan')
-                                        ->label('Supervisor NIK')
-                                        ->maxLength(50)
-                                        ->placeholder('Your direct supervisor NIK')
-                                        ->helperText('This will be auto-filled from API login data'),
-                                ]),
-                        ]),
-
-                    Forms\Components\Wizard\Step::make('Business Requirements')
-                        ->icon('heroicon-o-briefcase')
-                        ->schema([
-                            /*
-                            Forms\Components\Section::make('📋 Business Justification')
-                                ->schema([
-                                    Forms\Components\RichEditor::make('data')
-                                        ->label('Business Justification & Requirements')
-                                        ->required()
-                                        ->placeholder('Explain the business need, justification, and specific requirements for this document')
-                                        ->toolbarButtons([
-                                            'bold', 'italic', 'underline', 'strike',
-                                            'bulletList', 'orderedList',
-                                            'h2', 'h3', 'paragraph',
-                                            'link', 'undo', 'redo'
-                                        ])
-                                        ->columnSpanFull(),
-                                    Forms\Components\Grid::make(2)
-                                        ->schema([
-                                            Forms\Components\TextInput::make('lama_perjanjian_surat')
-                                                ->label('Contract/Agreement Duration')
-                                                ->placeholder('e.g., 12 months, 2 years, permanent')
-                                                ->helperText('Specify the intended duration of the agreement'),
-                                            Forms\Components\DatePicker::make('target_completion')
-                                                ->label('Target Completion Date')
-                                                ->placeholder('When do you need this completed?')
-                                                ->helperText('Helps prioritize and plan the workflow'),
-                                        ]),
-                                ]),
-                            */
-                        ]),
-
-                    Forms\Components\Wizard\Step::make('Terms & Conditions')
-                        ->icon('heroicon-o-scale')
-                        ->schema([
-                            Forms\Components\Section::make('💰 Financial Terms')
-                                ->schema([
-                                    Forms\Components\RichEditor::make('syarat_ketentuan_pembayaran')
-                                        ->label('Payment Terms & Conditions')
-                                        ->placeholder('Detail payment terms, schedules, methods, and conditions')
-                                        ->toolbarButtons([
-                                            'bold', 'italic', 'bulletList', 'orderedList',
-                                            'h3', 'paragraph', 'undo', 'redo'
-                                        ])
-                                        ->columnSpanFull(),
-                                    Forms\Components\RichEditor::make('pajak')
-                                        ->label('Tax Considerations')
-                                        ->placeholder('Specify tax implications, rates, and responsibilities')
-                                        ->toolbarButtons([
-                                            'bold', 'italic', 'bulletList', 'orderedList',
-                                            'h3', 'paragraph', 'undo', 'redo'
-                                        ])
-                                        ->columnSpanFull(),
-                                ]),
-                            Forms\Components\Section::make('⚖️ Rights & Obligations')
-                                ->schema([
-                                    Forms\Components\Grid::make(2)
-                                        ->schema([
-                                            Forms\Components\RichEditor::make('hak_mitra')
-                                                ->label('Partner Rights')
-                                                ->placeholder('Define rights of the partner/counterparty')
-                                                ->toolbarButtons(['bold', 'italic', 'bulletList', 'paragraph']),
-                                            Forms\Components\RichEditor::make('kewajiban_mitra')
-                                                ->label('Partner Obligations')
-                                                ->placeholder('Define obligations of the partner/counterparty')
-                                                ->toolbarButtons(['bold', 'italic', 'bulletList', 'paragraph']),
-                                        ]),
-                                    Forms\Components\Grid::make(2)
-                                        ->schema([
-                                            Forms\Components\RichEditor::make('hak_eci')
-                                                ->label('Company (ECI) Rights')
-                                                ->placeholder('Define rights of the company')
-                                                ->toolbarButtons(['bold', 'italic', 'bulletList', 'paragraph']),
-                                            Forms\Components\RichEditor::make('kewajiban_eci')
-                                                ->label('Company (ECI) Obligations')
-                                                ->placeholder('Define obligations of the company')
-                                                ->toolbarButtons(['bold', 'italic', 'bulletList', 'paragraph']),
-                                        ]),
-                                    Forms\Components\RichEditor::make('ketentuan_lain')
-                                        ->label('Additional Provisions')
-                                        ->placeholder('Any other terms, conditions, or special provisions')
-                                        ->toolbarButtons([
-                                            'bold', 'italic', 'bulletList', 'orderedList',
-                                            'h3', 'paragraph', 'undo', 'redo'
-                                        ])
-                                        ->columnSpanFull(),
-                                ]),
-                        ]),
-
-                    Forms\Components\Wizard\Step::make('Document Attachments')
-                        ->icon('heroicon-o-paper-clip')
-                        ->schema([
-                            Forms\Components\Section::make('📎 Upload Required Documents')
-                                ->description('Upload all necessary supporting documents')
-                                ->schema([
-                                    Forms\Components\Grid::make(2)
-                                        ->schema([
-                                            Forms\Components\FileUpload::make('dokumen_utama')
-                                                ->label('Main Document')
-                                                ->acceptedFileTypes(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'])
-                                                ->maxSize(10240) // 10MB
-                                                ->downloadable()
-                                                ->previewable()
-                                                ->helperText('Upload the primary document (PDF, DOC, DOCX - Max: 10MB)'),
-                                            Forms\Components\FileUpload::make('akta_pendirian')
-                                                ->label('Articles of Incorporation')
-                                                ->acceptedFileTypes(['application/pdf'])
-                                                ->maxSize(5120) // 5MB
-                                                ->downloadable()
-                                                ->previewable()
-                                                ->helperText('Company incorporation documents (PDF - Max: 5MB)'),
-                                        ]),
-                                    Forms\Components\Grid::make(2)
-                                        ->schema([
-                                            Forms\Components\FileUpload::make('supporting_documents')
-                                                ->label('Supporting Documents')
-                                                ->multiple()
-                                                ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
-                                                ->maxSize(5120)
-                                                ->maxFiles(5)
-                                                ->downloadable()
-                                                ->previewable()
-                                                ->helperText('Additional supporting files (Max: 5 files, 5MB each)'),
-                                            Forms\Components\FileUpload::make('reference_documents')
-                                                ->label('Reference Documents')
-                                                ->multiple()
-                                                ->acceptedFileTypes(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'])
-                                                ->maxSize(5120)
-                                                ->maxFiles(3)
-                                                ->downloadable()
-                                                ->previewable()
-                                                ->helperText('Reference materials or templates (Max: 3 files, 5MB each)'),
-                                        ]),
-                                ]),
-                        ]),
-                ])
-                ->columnSpanFull()
-                ->persistStepInQueryString()
-                ->submitAction(new \Filament\Forms\Components\Actions\Action('submit'))
-            ]);
-    }
-
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('submitted_at')
+                    ->label('Diunggah')
+                    ->dateTime('M d, Y H:i')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('nomor_dokumen')
-                    ->label('Doc Number')
+                    ->label('No. Dokumen')
                     ->searchable()
                     ->sortable()
-                    ->placeholder('Pending')
                     ->copyable()
                     ->size('sm')
                     ->color('primary')
                     ->weight(FontWeight::Bold),
-                
                 Tables\Columns\TextColumn::make('title')
+                    ->label('Nama Mitra')
                     ->searchable()
                     ->sortable()
                     ->limit(40)
@@ -326,27 +71,23 @@ class DocumentRequestResource extends Resource
                         return $record->title;
                     })
                     ->weight(FontWeight::Medium),
-                
                 Tables\Columns\TextColumn::make('nama')
-                    ->label('Requester')
+                    ->label('PIC')
                     ->searchable()
                     ->sortable()
                     ->size('sm')
                     ->weight(FontWeight::Medium),
-                
-                Tables\Columns\TextColumn::make('divisi')
-                    ->label('Division')
+                Tables\Columns\TextColumn::make('dept')
+                    ->label('Departemen')
                     ->searchable()
                     ->badge()
                     ->color('info')
                     ->size('sm'),
-                
                 Tables\Columns\TextColumn::make('doctype.document_name')
-                    ->label('Doc Type')
+                    ->label('Jenis Perjanjian')
                     ->badge()
                     ->color('primary')
                     ->size('sm'),
-
                 Tables\Columns\BadgeColumn::make('decision')
                     ->label('Your Decision')
                     ->getStateUsing(function ($record) {
@@ -365,7 +106,6 @@ class DocumentRequestResource extends Resource
 
                         return $approval->status; // 'approved' / 'rejected'
                     }),
-                
                 Tables\Columns\BadgeColumn::make('computed_status')
                     ->label('Status')
                     ->colors([
@@ -417,15 +157,8 @@ class DocumentRequestResource extends Resource
                     ->size('sm'),
                 */
 
-                Tables\Columns\TextColumn::make('submitted_at')
-                    ->label('Submitted')
-                    ->dateTime('M j, Y')
-                    ->dateTime()
-                    ->sortable()
-                    ->size('sm'),
-
                 Tables\Columns\TextColumn::make('completed_at')
-                    ->label('Completed')
+                    ->label('Completed at')
                     ->sortable()
                     ->getStateUsing(function ($record) {
                         // Pakai completed_at kalau ada, kalau null pakai status fallback
@@ -502,7 +235,8 @@ class DocumentRequestResource extends Resource
                                 $docReqQuery->whereIn('status', $data['statuses']);
                             });
                         });
-                    }),
+                    })
+                    ->native(false),
                 
                 /* priority field is unnecessary
                 SelectFilter::make('priority')
@@ -567,19 +301,22 @@ class DocumentRequestResource extends Resource
                                     break;
                             }
                         });
-                    }),
+                    })
+                    ->native(false),
 
                 SelectFilter::make('tipe_dokumen')
+                    ->label('Jenis Perjanjian')
                     ->relationship('doctype', 'document_name')
                     ->searchable()
                     ->preload()
                     ->multiple(),
                 
-                SelectFilter::make(name: 'divisi')
+                SelectFilter::make(name: 'dept')
+                    ->label('Departemen')
                     ->options(function () {
-                        return DocumentRequest::whereNotNull('divisi')
+                        return DocumentRequest::whereNotNull('dept')
                             ->distinct()
-                            ->pluck('divisi', 'divisi')
+                            ->pluck('dept', 'dept')
                             ->filter()
                             ->toArray();
                     })
@@ -651,6 +388,125 @@ class DocumentRequestResource extends Resource
                 Tables\Actions\ViewAction::make()
                     ->color('info')
                     ->size('sm'),
+
+            Tables\Actions\Action::make('view_ao')
+                ->label('View AO')
+                ->icon('heroicon-o-chat-bubble-left-right')
+                ->color('info')
+                ->size('sm')
+                ->modalContent(function (DocumentRequest $record) {
+                    $ao = \DB::table('agreement_overviews')
+                        ->where('document_request_id', $record->id)
+                        ->first();
+                        
+                    if (!$ao) {
+                        return new \Illuminate\Support\HtmlString('<p>No Agreement Overview found.</p>');
+                    }
+                    
+                    $statusColors = [
+                        'draft' => 'bg-gray-100 text-gray-800',
+                        'pending_head' => 'bg-yellow-100 text-yellow-800',
+                        'pending_gm' => 'bg-blue-100 text-blue-800',
+                        'pending_finance' => 'bg-purple-100 text-purple-800',
+                        'pending_legal' => 'bg-indigo-100 text-indigo-800',
+                        'pending_director1' => 'bg-orange-100 text-orange-800',
+                        'pending_director2' => 'bg-pink-100 text-pink-800',
+                        'approved' => 'bg-green-100 text-green-800',
+                        'rejected' => 'bg-red-100 text-red-800',
+                        'rediscuss' => 'bg-gray-100 text-gray-800',
+                    ];
+                    
+                    $statusLabels = [
+                        'draft' => 'Draft',
+                        'pending_head' => 'Pending Head Approval',
+                        'pending_gm' => 'Pending GM Approval',
+                        'pending_finance' => 'Pending Finance Approval',
+                        'pending_legal' => 'Pending Legal Approval',
+                        'pending_director1' => 'Pending Director 1 Approval',
+                        'pending_director2' => 'Pending Director 2 Approval',
+                        'approved' => 'Fully Approved',
+                        'rejected' => 'Rejected',
+                        'rediscuss' => 'Back to Discussion',
+                    ];
+                    
+                    $statusColor = $statusColors[$ao->status] ?? 'bg-gray-100 text-gray-800';
+                    $statusText = $statusLabels[$ao->status] ?? ucfirst(str_replace('_', ' ', $ao->status));
+                    
+                    // Simple progress tracking for user
+                    $progressSteps = [
+                        'draft' => '📝 Draft Created',
+                        'pending_head' => '👨‍💼 Head Review',
+                        'pending_gm' => '🎯 GM Review', 
+                        'pending_finance' => '💰 Finance Review',
+                        'pending_legal' => '⚖️ Legal Review',
+                        'pending_director1' => '👔 Director 1 Review',
+                        'pending_director2' => '👔 Director 2 Review',
+                        'approved' => '✅ Fully Approved'
+                    ];
+                    
+                    $currentStepIndex = array_search($ao->status, array_keys($progressSteps));
+                    
+                    $progressHtml = '<div class="mb-4"><h4 class="font-medium mb-2">Approval Progress</h4><div class="space-y-1">';
+                    foreach ($progressSteps as $stepStatus => $stepLabel) {
+                        $stepIndex = array_search($stepStatus, array_keys($progressSteps));
+                        $isCompleted = $stepIndex < $currentStepIndex || $ao->status === 'approved';
+                        $isCurrent = $stepStatus === $ao->status;
+                        
+                        $stepClass = $isCompleted ? 'text-green-600' : ($isCurrent ? 'text-blue-600 font-medium' : 'text-gray-400');
+                        $icon = $isCompleted ? '✅' : ($isCurrent ? '🔄' : '⏳');
+                        
+                        $progressHtml .= "<div class='{$stepClass} text-sm'>{$icon} {$stepLabel}</div>";
+                    }
+                    $progressHtml .= '</div></div>';
+                    
+                    return new \Illuminate\Support\HtmlString("
+                        <div class='space-y-4'>
+                            {$progressHtml}
+                            
+                            <div class='grid grid-cols-1 gap-3'>
+                                <div>
+                                    <label class='block text-sm font-medium text-gray-700'>AO Number</label>
+                                    <p class='text-lg font-semibold text-blue-600'>{$ao->nomor_dokumen}</p>
+                                </div>
+                                <div>
+                                    <label class='block text-sm font-medium text-gray-700'>Current Status</label>
+                                    <span class='inline-flex px-3 py-1 text-sm font-medium rounded-full {$statusColor}'>
+                                        {$statusText}
+                                    </span>
+                                </div>
+                                <div>
+                                    <label class='block text-sm font-medium text-gray-700'>Description</label>
+                                    <p class='text-gray-900'>{$ao->deskripsi}</p>
+                                </div>
+                                <div>
+                                    <label class='block text-sm font-medium text-gray-700'>Counterparty</label>
+                                    <p class='text-gray-900'>{$ao->counterparty}</p>
+                                </div>
+                            </div>
+                            
+                            <div class='bg-blue-50 p-3 rounded-md'>
+                                <h5 class='font-medium text-blue-900 mb-2'>Assigned Directors</h5>
+                                <div class='text-sm text-blue-800'>
+                                    <div><strong>Director 1 (Auto):</strong> {$ao->director1_name}</div>
+                                    <div><strong>Director 2 (Selected):</strong> {$ao->director2_name}</div>
+                                </div>
+                            </div>
+                            
+                            <div class='text-xs text-gray-500 pt-3 border-t'>
+                                <div><strong>Created:</strong> {$ao->created_at}</div>
+                                <div><strong>Last Updated:</strong> {$ao->updated_at}</div>
+                            </div>
+                        </div>
+                    ");
+                })
+                ->modalHeading('My Agreement Overview')
+                ->modalSubmitAction(false)
+                ->modalCancelActionLabel('Close')
+                ->visible(function (DocumentRequest $record) {
+                    return \DB::table('agreement_overviews')
+                        ->where('document_request_id', $record->id)
+                        ->exists();
+                }),
                 
                 Tables\Actions\EditAction::make()
                     ->color('warning')
@@ -662,42 +518,6 @@ class DocumentRequestResource extends Resource
                         // Only allow editing drafts by creator or admin
                         return ($record->status === 'draft' && $record->nik === $user->nik) || 
                                $user->role === 'admin';
-                    }),
-                
-                Tables\Actions\Action::make('submit')
-                    ->label('Submit')
-                    ->icon('heroicon-o-paper-airplane')
-                    ->color('success')
-                    ->size('sm')
-                    ->action(function ($record) {
-                        try {
-                            $workflowService = app(DocumentWorkflowService::class);
-                            $workflowService->submitDocument($record, auth()->user());
-                            
-                            Notification::make()
-                                ->title('Document submitted successfully')
-                                ->body('Your document has been submitted for approval.')
-                                ->success()
-                                ->send();
-                        } catch (\Exception $e) {
-                            Notification::make()
-                                ->title('Error submitting document')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    })
-                    ->requiresConfirmation()
-                    ->modalHeading('Submit Document')
-                    ->modalDescription('Are you sure you want to submit this document for approval? You won\'t be able to edit it after submission.')
-                    ->visible(function ($record) {
-                        $user = auth()->user();
-                        if (!$user) return false;
-                        
-                        return $record->status === 'draft' && 
-                               $record->nik === $user->nik &&
-                               $record->title && 
-                               $record->description;
                     }),
                 
                 // Tables\Actions\Action::make('approve')
@@ -1057,10 +877,10 @@ class DocumentRequestResource extends Resource
                                     ->color('primary')
                                     ->copyable(),
                                 Infolists\Components\TextEntry::make('title')
-                                    ->label('Judul Dokumen')
+                                    ->label('Nama Mitra')
                                     ->weight(FontWeight::Medium),
                                 Infolists\Components\TextEntry::make('doctype.document_name')
-                                    ->label('Tipe Dokumen')
+                                    ->label('Jenis Perjanjian')
                                     ->badge()
                                     ->color('info'),
                             ]),
@@ -1120,7 +940,7 @@ class DocumentRequestResource extends Resource
                                     ->formatStateUsing(fn($state) => ucfirst($state)),
                                 */
                                 Infolists\Components\TextEntry::make('doc_filter')
-                                    ->label('Document Action')
+                                    ->label('Document')
                                     ->badge()
                                     ->color('secondary')
                                     ->formatStateUsing(fn($state) => $state === 'create' ? 'Create New' : 'Review Existing'),
@@ -1137,11 +957,13 @@ class DocumentRequestResource extends Resource
                                     ->label('⏰ Jangka Waktu Perjanjian')
                                     ->placeholder('Not specified'),
                             ]),
+                        /*
                         Infolists\Components\TextEntry::make('description')
                             ->label('📝 Deskripsi Dokumen')
                             ->html()
                             ->columnSpanFull()
                             ->placeholder('Tidak ada deskripsi pada Document Request ini.'),
+                        */
                     ]),
 
                 Infolists\Components\Section::make('👤 Requester Information')
@@ -1149,17 +971,14 @@ class DocumentRequestResource extends Resource
                         Infolists\Components\Grid::make(3)
                             ->schema([
                                 Infolists\Components\TextEntry::make('nama')
-                                    ->label('Requester Name')
+                                    ->label('PIC')
                                     ->weight(FontWeight::Medium)
                                     ->color('primary'),
                                 Infolists\Components\TextEntry::make('nik')
-                                    ->label('Employee ID (NIK)')
+                                    ->label('NIK')
                                     ->copyable(),
                                 Infolists\Components\TextEntry::make('jabatan')
                                     ->label('Position'),
-                            ]),
-                        Infolists\Components\Grid::make(3)
-                            ->schema([
                                 Infolists\Components\TextEntry::make('divisi')
                                     ->label('Division')
                                     ->badge()
@@ -1168,9 +987,6 @@ class DocumentRequestResource extends Resource
                                     ->label('Department'),
                                 Infolists\Components\TextEntry::make('direktorat')
                                     ->label('Directorate'),
-                            ]),
-                        Infolists\Components\Grid::make(3)
-                            ->schema([
                                 Infolists\Components\TextEntry::make('nama_atasan')
                                     ->label('Supervisor Name')
                                     ->placeholder('Not specified'),
@@ -1188,7 +1004,7 @@ class DocumentRequestResource extends Resource
                                     ->label('⏰ Jangka Waktu Perjanjian')
                                     ->placeholder('Not specified'),
                                 Infolists\Components\TextEntry::make('doc_filter')
-                                    ->label('📑 Tipe Dokumen')
+                                    ->label('📑 Document')
                                     ->formatStateUsing(fn($state) => match($state) {
                                         'review' => '🔍 Review',
                                         'create' => '✨ Create New',
@@ -1196,12 +1012,12 @@ class DocumentRequestResource extends Resource
                                     })
                                     ->badge(),
                             ]),
+                        /*
                         Infolists\Components\TextEntry::make('description')
                             ->label('📝 Deskripsi Dokumen')
                             ->html()
                             ->columnSpanFull()
                             ->placeholder('Tidak ada deskripsi pada Document Request ini.'),
-                        /*
                         Infolists\Components\TextEntry::make('data')
                             ->label('Business Justification')
                             ->html()
@@ -1218,12 +1034,12 @@ class DocumentRequestResource extends Resource
                                     ->label('📝 Kewajiban Mitra')
                                     ->html()
                                     ->placeholder('Not specified'),
-                                Infolists\Components\TextEntry::make('hak_mitra')
-                                    ->label('✅ Hak Mitra')
-                                    ->html()
-                                    ->placeholder('Not specified'),
                                 Infolists\Components\TextEntry::make('kewajiban_eci')
                                     ->label('📝 Kewajiban ECI')
+                                    ->html()
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('hak_mitra')
+                                    ->label('✅ Hak Mitra')
                                     ->html()
                                     ->placeholder('Not specified'),
                                 Infolists\Components\TextEntry::make('hak_eci')
@@ -1263,7 +1079,7 @@ class DocumentRequestResource extends Resource
 
                 // ATTACHMENTS - SELALU TAMPIL tanpa visible condition
                 Infolists\Components\Section::make('📎 Lampiran Dokumen')
-                    ->schema([
+                    ->schema([                               
                         Infolists\Components\TextEntry::make('dokumen_utama')
                             ->label('📄 Main Document')
                             ->formatStateUsing(function($state) {
@@ -1279,7 +1095,7 @@ class DocumentRequestResource extends Resource
                         Infolists\Components\Grid::make(2)
                             ->schema([                                
                                 Infolists\Components\TextEntry::make('akta_pendirian')
-                                    ->label('🏢 Akta Pendirian')
+                                    ->label('🏢 Akta Pendirian + SK')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -1293,7 +1109,7 @@ class DocumentRequestResource extends Resource
                                     ->tooltip(fn ($record) => $record->akta_pendirian), // full text muncul di hover
 
                                 Infolists\Components\TextEntry::make('akta_perubahan')
-                                    ->label('📋 Akta Perubahan')
+                                    ->label('📋 Akta PT & SK Anggaran Dasar perubahan terakhir')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -1321,7 +1137,7 @@ class DocumentRequestResource extends Resource
                                     ->tooltip(fn ($record) => $record->npwp), // full text muncul di hover
                                 
                                 Infolists\Components\TextEntry::make('ktp_direktur')
-                                    ->label('🆔 KTP kuasa Direktur')
+                                    ->label('🆔 KTP kuasa Direksi (bila penandatangan bukan Direksi)')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -1349,7 +1165,7 @@ class DocumentRequestResource extends Resource
                                     ->tooltip(fn ($record) => $record->nib), // full text muncul di hover
                                 
                                 Infolists\Components\TextEntry::make('surat_kuasa')
-                                    ->label('✍️ Surat kuasa Direktur')
+                                    ->label('✍️ Surat kuasa Direksi (bila penandatangan bukan Direksi)')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -1411,28 +1227,30 @@ Infolists\Components\Section::make('Discussion Forum')
                         Infolists\Components\Grid::make(4)
                             ->schema([
                                 Infolists\Components\TextEntry::make('created_at')
-                                    ->label('📅 Created')
+                                    ->label('📅 Dibuat')
                                     ->dateTime()
                                     ->since(),
                                 Infolists\Components\TextEntry::make('submitted_at')
-                                    ->label('📤 Submitted')
+                                    ->label('📤 Diunggah')
                                     ->dateTime()
                                     ->since()
                                     ->placeholder('Not submitted yet'),
                                 Infolists\Components\TextEntry::make('completed_at')
-                                    ->label('✅ Completed')
-                                    ->dateTime()
-                                    ->since()
-                                    ->placeholder('Not completed yet'),
-                                Infolists\Components\TextEntry::make('processing_time')
-                                    ->label('⏳ Processing Time')
+                                    ->label('✅ Selesai')
+                                    ->formatStateUsing(function ($state) {
+                                        if (empty($state)) {
+                                            return 'Dalam proses'; // placeholder manual
+                                        }
+
+                                        return \Carbon\Carbon::parse($state)->format('d M Y H:i');
+                                    }),
+                                Infolists\Components\TextEntry::make('total_processing_time')
+                                    ->label('Jumlah Hari Diproses')
                                     ->getStateUsing(function ($record) {
                                         if ($record->submitted_at && $record->completed_at) {
                                             return $record->submitted_at->diffForHumans($record->completed_at, true);
-                                        } elseif ($record->submitted_at) {
-                                            return $record->submitted_at->diffForHumans(now(), true) . ' (ongoing)';
                                         }
-                                        return 'N/A';
+                                        return 'Dalam proses';
                                     }),
                             ]),
                     ]),
@@ -1544,11 +1362,11 @@ Infolists\Components\Section::make('Discussion Forum')
                                     ->label('📅 Date')
                                     ->dateTime()
                                     ->since()
-                                    ->placeholder('⏳ Pending'),
+                                    ->formatStateUsing(fn ($state) => $state ? $state->diffForHumans() : '⏳ Pending'),
 
                                 Infolists\Components\TextEntry::make('comments')
                                     ->label('💬 Comments / Notes')
-                                    ->placeholder('No comments')
+                                    ->formatStateUsing(fn ($state) => $state ?: 'No comments')
                                     ->limit(100)
                                     ->tooltip(fn($state) => $state),
                             ])
@@ -1688,7 +1506,8 @@ Infolists\Components\Section::make('Discussion Forum')
             'create' => Pages\CreateDocumentRequest::route('/create'),
             'view' => Pages\ViewDocumentRequest::route('/{record}'),
             'edit' => Pages\EditDocumentRequest::route('/{record}/edit'),
-             'discussion' => Pages\ViewDiscussion::route('/{record}/discussion'),
+            'discussion' => Pages\ViewDiscussion::route('/{record}/discussion'),
+            'view_ao'   => Pages\AgreementOverviews::route('/{record}/ao')
         ];
     }
 

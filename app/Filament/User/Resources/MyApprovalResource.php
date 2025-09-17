@@ -4,6 +4,7 @@
 namespace App\Filament\User\Resources;
 
 use App\Filament\User\Resources\MyApprovalResource\Pages;
+use App\Filament\User\Resources\MyApprovalResource\Pages\PendingAgreementOverview;
 use App\Models\DocumentRequest;
 use App\Services\DocumentRequestService;
 use App\Services\NotificationService;
@@ -163,47 +164,72 @@ class MyApprovalResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('submitted_at')
+                    ->label('Diunggah')
+                    ->date()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('nomor_dokumen')
-                    ->label('Document Number')
+                    ->label('No. Dokumen')
                     ->searchable()
                     ->placeholder('Not assigned')
                     ->copyable(),
-                    
                 Tables\Columns\TextColumn::make('title')
+                    ->label('Nama Mitra')
                     ->searchable()
                     ->sortable()
                     ->limit(40)
                     ->tooltip(function ($record) {
                         return $record->title;
                     }),
-                    
-                Tables\Columns\TextColumn::make('nama')
-                    ->label('Requester')
-                    ->searchable()
-                    ->sortable(),
-                    
-                Tables\Columns\TextColumn::make('divisi')
-                    ->label('Division')
-                    ->searchable(),
-                    
                 Tables\Columns\TextColumn::make('doctype.document_name')
-                    ->label('Document Type')
+                    ->label('Jenis Perjanjian')
                     ->badge()
                     ->color('primary'),
-                    
-                Tables\Columns\BadgeColumn::make('status')
+                Tables\Columns\TextColumn::make('nama')
+                    ->label('PIC')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('dept')
+                    ->label('Departemen')
+                    ->searchable(), 
+                Tables\Columns\BadgeColumn::make('computed_status')
+                    ->label('Status')
                     ->colors([
                         'warning' => 'pending_supervisor',
-                        'info' => 'pending_gm',
+                        'info'    => 'pending_gm',
                         'primary' => ['pending_legal', 'pending_legal_admin'],
-                        'gray' => 'submitted',
+                        'gray'    => 'submitted',
+
+                        // AO stages
+                        'purple'  => \App\Models\AgreementOverview::STATUS_PENDING_HEAD,
+                        'success' => \App\Models\AgreementOverview::STATUS_APPROVED,
+                        'danger'  => \App\Models\AgreementOverview::STATUS_REJECTED,
                     ])
-                    ->formatStateUsing(fn($state) => match($state) {
-                        'pending_supervisor' => 'Pending Supervisor',
-                        'pending_gm' => 'Pending GM',
-                        'pending_legal_admin' => 'Pending Legal',
-                        'pending_legal' => 'Pending Legal',
-                        default => str_replace('_', ' ', ucwords($state))
+                    ->formatStateUsing(function ($state, $record) {
+                        // sekarang $state sudah computed_status (bisa AO / docreq)
+                        return match ($state) {
+                            \App\Models\AgreementOverview::STATUS_DRAFT             => 'AO Draft',
+                            \App\Models\AgreementOverview::STATUS_PENDING_HEAD      => 'AO - Pending Head',
+                            \App\Models\AgreementOverview::STATUS_PENDING_GM        => 'AO - Pending GM',
+                            \App\Models\AgreementOverview::STATUS_PENDING_FINANCE   => 'AO - Pending Finance',
+                            \App\Models\AgreementOverview::STATUS_PENDING_LEGAL     => 'AO - Pending Legal',
+                            \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR1 => 'AO - Pending Director 1',
+                            \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR2 => 'AO - Pending Director 2',
+                            \App\Models\AgreementOverview::STATUS_APPROVED          => 'AO Approved',
+                            \App\Models\AgreementOverview::STATUS_REJECTED          => 'AO Rejected',
+                            \App\Models\AgreementOverview::STATUS_REDISCUSS         => 'AO Back to Discussion',
+
+                            'pending_supervisor'   => 'Pending Supervisor',
+                            'pending_gm'           => 'Pending GM',
+                            'pending_legal_admin'  => 'Pending Admin Legal',
+                            'pending_legal'        => 'Pending Legal',
+                            'in_discussion'        => 'On Discussion Forum',
+                            'agreement_creation'   => 'Ready for AO',
+                            'completed'            => 'Agreement Successful',
+                            'approved'             => 'Approved',
+                            'rejected'             => 'Rejected',
+                            default                => 'You haven\'t been involved yet',
+                        };
                     }),
                 
                 /*
@@ -215,18 +241,16 @@ class MyApprovalResource extends Resource
                         'danger' => 'urgent',
                     ]),
                 */
-                    
-                Tables\Columns\TextColumn::make('submitted_at')
-                    ->label('Submitted')
-                    ->dateTime()
-                    ->sortable(),
-                    
                 Tables\Columns\TextColumn::make('days_pending')
                     ->label('Days Pending')
-                    ->getStateUsing(fn($record) => $record->submitted_at ? now()->diffInDays($record->submitted_at) : 0)
+                    ->getStateUsing(fn ($record) => 
+                        $record->status === 'pending'
+                            ? now()->diffInDays($record->created_at)
+                            : 0
+                    )
                     ->badge()
-                    ->color(fn($state) => $state > 7 ? 'danger' : ($state > 3 ? 'warning' : 'success')),
-                    
+                    ->color(fn ($state) => $state > 7 ? 'danger' : ($state > 3 ? 'warning' : 'success')),
+
                 // Show current approval step
                 Tables\Columns\TextColumn::make('current_step')
                     ->label('Your Role')
@@ -275,18 +299,26 @@ class MyApprovalResource extends Resource
                         'pending_supervisor' => 'Pending Supervisor',
                         'pending_gm' => 'Pending GM',
                         'pending_legal_admin' => 'Pending Legal',
-                    ]),
+                    ])
+                    ->native(false),
                     
-                SelectFilter::make('divisi')
-                    ->label('Division'),
+                SelectFilter::make('dept')
+                    ->label('Departemen')
+                    ->native(false),
                     
                 SelectFilter::make('tipe_dokumen')
+                    ->label('Jenis Perjanjian')
                     ->relationship('doctype', 'document_name')
                     ->searchable()
                     ->preload(),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
+                Tables\Actions\ViewAction::make()
+                    ->label('View LRF'),
+                Tables\Actions\Action::make('view_pending_ao')
+                    ->label('View Pending AO')
+                    ->icon('heroicon-o-eye')
+                    ->url(fn ($record) => PendingAgreementOverview::getUrl(['record' => $record->id])),
                 
                 /* approve/reject move to infolist below
                 Tables\Actions\Action::make('approve')
@@ -469,7 +501,7 @@ class MyApprovalResource extends Resource
         return match($record->status) {
             'pending_supervisor' => static::isSupervisorLevel($user) ? 'supervisor' : null,
             'pending_gm' => static::isGeneralManagerLevel($user) ? 'general_manager' : null,
-            'pending_legal_admin', 'pending_legal' => static::isLegalAdminLevel($user) ? 'admin_legal' : null,
+            'pending_legal_admin', 'pending_legal' => static::isLegalAdminLevel($user) ? ['admin_legal', 'legal_admin'] : null,
             default => null
         };
     }
@@ -492,21 +524,48 @@ class MyApprovalResource extends Resource
                                     ->label('Nama Mitra')
                                     ->weight(FontWeight::Medium),
                                 Infolists\Components\TextEntry::make('doctype.document_name')
-                                    ->label('Tipe Dokumen')
-                                    ->badge()
-                                    ->color('info'),
-                            ]),
-                        Infolists\Components\Grid::make(3)
-                            ->schema([
-                                Infolists\Components\TextEntry::make('status')
+                                    ->label('Jenis Perjanjian')
+                                    ->badge(),
+                                Infolists\Components\TextEntry::make('computed_status')
                                     ->label('Status')
                                     ->badge()
-                                    ->color(fn($state) => match($state) {
-                                        'pending_supervisor' => 'warning',
-                                        'pending_gm' => 'info',
-                                        'pending_legal', 'pending_legal_admin' => 'primary',
-                                        default => 'gray'
-                                    }),
+                                    ->colors([
+                                        'warning' => 'pending_supervisor',
+                                        'info'    => 'pending_gm',
+                                        'primary' => ['pending_legal', 'pending_legal_admin'],
+                                        'gray'    => 'submitted',
+
+                                        // AO stages
+                                        'purple'  => \App\Models\AgreementOverview::STATUS_PENDING_HEAD,
+                                        'success' => \App\Models\AgreementOverview::STATUS_APPROVED,
+                                        'danger'  => \App\Models\AgreementOverview::STATUS_REJECTED,
+                                    ])
+                                    ->formatStateUsing(function ($state, $record) {
+                                        return match ($state) {
+                                            \App\Models\AgreementOverview::STATUS_DRAFT             => 'AO Draft',
+                                            \App\Models\AgreementOverview::STATUS_PENDING_HEAD      => 'AO - Pending Head',
+                                            \App\Models\AgreementOverview::STATUS_PENDING_GM        => 'AO - Pending GM',
+                                            \App\Models\AgreementOverview::STATUS_PENDING_FINANCE   => 'AO - Pending Finance',
+                                            \App\Models\AgreementOverview::STATUS_PENDING_LEGAL     => 'AO - Pending Legal',
+                                            \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR1 => 'AO - Pending Director 1',
+                                            \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR2 => 'AO - Pending Director 2',
+                                            \App\Models\AgreementOverview::STATUS_APPROVED          => 'AO Approved',
+                                            \App\Models\AgreementOverview::STATUS_REJECTED          => 'AO Rejected',
+                                            \App\Models\AgreementOverview::STATUS_REDISCUSS         => 'AO Back to Discussion',
+
+                                            'pending_supervisor'   => 'Pending Supervisor',
+                                            'pending_gm'           => 'Pending GM',
+                                            'pending_legal_admin'  => 'Pending Admin Legal',
+                                            'pending_legal'        => 'Pending Legal',
+                                            'in_discussion'        => 'On Discussion Forum',
+                                            'agreement_creation'   => 'Ready for AO',
+                                            'completed'            => 'Agreement Successful',
+                                            'approved'             => 'Approved',
+                                            'rejected'             => 'Rejected',
+                                            default                => 'You haven\'t been involved yet',
+                                        };
+                                    })
+                                    ->getStateUsing(fn ($record) => $record->computed_status),
                                 
                                 /*
                                 Infolists\Components\TextEntry::make('priority')
@@ -542,17 +601,14 @@ class MyApprovalResource extends Resource
                         Infolists\Components\Grid::make(3)
                             ->schema([
                                 Infolists\Components\TextEntry::make('nama')
-                                    ->label('Requester Name')
+                                    ->label('PIC')
                                     ->weight(FontWeight::Medium)
                                     ->color('primary'),
                                 Infolists\Components\TextEntry::make('nik')
-                                    ->label('Employee ID (NIK)')
+                                    ->label('NIK')
                                     ->copyable(),
                                 Infolists\Components\TextEntry::make('jabatan')
                                     ->label('Position'),
-                            ]),
-                        Infolists\Components\Grid::make(3)
-                            ->schema([
                                 Infolists\Components\TextEntry::make('divisi')
                                     ->label('Division'),
                                 Infolists\Components\TextEntry::make('dept')
@@ -570,7 +626,7 @@ class MyApprovalResource extends Resource
                                     ->label('⏰ Jangka Waktu Perjanjian')
                                     ->placeholder('Not specified'),
                                 Infolists\Components\TextEntry::make('doc_filter')
-                                    ->label('📑 Tipe Dokumen')
+                                    ->label('📑 Document')
                                     ->formatStateUsing(fn($state) => match($state) {
                                         'review' => '🔍 Review',
                                         'create' => '✨ Create New',
@@ -578,12 +634,13 @@ class MyApprovalResource extends Resource
                                     })
                                     ->badge(),
                             ]),
+                        /*
                         Infolists\Components\TextEntry::make('description')
                             ->label('📝 Deskripsi Dokumen')
                             ->html()
                             ->columnSpanFull()
                             ->placeholder('Tidak ada deskripsi pada Document Request ini.'),
-                        /*
+
                         Infolists\Components\TextEntry::make('data')
                             ->label('Business Justification')
                             ->html()
@@ -600,12 +657,12 @@ class MyApprovalResource extends Resource
                                     ->label('📝 Kewajiban Mitra')
                                     ->html()
                                     ->placeholder('Not specified'),
-                                Infolists\Components\TextEntry::make('hak_mitra')
-                                    ->label('✅ Hak Mitra')
-                                    ->html()
-                                    ->placeholder('Not specified'),
                                 Infolists\Components\TextEntry::make('kewajiban_eci')
                                     ->label('📝 Kewajiban ECI')
+                                    ->html()
+                                    ->placeholder('Not specified'),
+                                Infolists\Components\TextEntry::make('hak_mitra')
+                                    ->label('✅ Hak Mitra')
                                     ->html()
                                     ->placeholder('Not specified'),
                                 Infolists\Components\TextEntry::make('hak_eci')
@@ -613,7 +670,8 @@ class MyApprovalResource extends Resource
                                     ->html()
                                     ->placeholder('Not specified'),
                             ]),
-                    ]),
+                    ])
+                    ->collapsible(),
 
                 // CONTRACT TERMS - SELALU TAMPIL
                 Infolists\Components\Section::make('📋 Regulasi Finansial')
@@ -628,7 +686,8 @@ class MyApprovalResource extends Resource
                             ->columnSpanFull()
                             ->html()
                             ->placeholder('Not specified'),
-                    ]),
+                    ])
+                    ->collapsible(),
 
                 // ADDITIONAL TERMS - SELALU TAMPIL
                 Infolists\Components\Section::make('📄 Ketentuan Tambahan')
@@ -638,11 +697,12 @@ class MyApprovalResource extends Resource
                             ->columnSpanFull()
                             ->html()
                             ->placeholder('Tidak ada ketentuan tambahan.'),
-                    ]),
+                    ])
+                    ->collapsible(),
 
                 // ATTACHMENTS - SELALU TAMPIL tanpa visible condition
                 Infolists\Components\Section::make('📎 Lampiran Dokumen')
-                    ->schema([
+                    ->schema([                               
                         Infolists\Components\TextEntry::make('dokumen_utama')
                             ->label('📄 Main Document')
                             ->formatStateUsing(function($state) {
@@ -658,7 +718,7 @@ class MyApprovalResource extends Resource
                         Infolists\Components\Grid::make(2)
                             ->schema([                                
                                 Infolists\Components\TextEntry::make('akta_pendirian')
-                                    ->label('🏢 Akta Pendirian')
+                                    ->label('🏢 Akta Pendirian + SK')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -672,7 +732,7 @@ class MyApprovalResource extends Resource
                                     ->tooltip(fn ($record) => $record->akta_pendirian), // full text muncul di hover
 
                                 Infolists\Components\TextEntry::make('akta_perubahan')
-                                    ->label('📋 Akta Perubahan')
+                                    ->label('📋 Akta PT & SK Anggaran Dasar perubahan terakhir')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -700,7 +760,7 @@ class MyApprovalResource extends Resource
                                     ->tooltip(fn ($record) => $record->npwp), // full text muncul di hover
                                 
                                 Infolists\Components\TextEntry::make('ktp_direktur')
-                                    ->label('🆔 KTP kuasa Direktur')
+                                    ->label('🆔 KTP kuasa Direksi (bila penandatangan bukan Direksi)')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -728,7 +788,7 @@ class MyApprovalResource extends Resource
                                     ->tooltip(fn ($record) => $record->nib), // full text muncul di hover
                                 
                                 Infolists\Components\TextEntry::make('surat_kuasa')
-                                    ->label('✍️ Surat kuasa Direktur')
+                                    ->label('✍️ Surat kuasa Direksi (bila penandatangan bukan Direksi)')
                                     ->formatStateUsing(function($state) {
                                         if (!$state) return '➖ Not provided';
                                         $filename = basename($state);
@@ -748,16 +808,16 @@ class MyApprovalResource extends Resource
                         Infolists\Components\Grid::make(3)
                             ->schema([
                                 Infolists\Components\TextEntry::make('created_at')
-                                    ->label('📅 Created')
+                                    ->label('📅 Dibuat')
                                     ->dateTime()
                                     ->since(),
                                 Infolists\Components\TextEntry::make('submitted_at')
-                                    ->label('📤 Submitted')
+                                    ->label('📤 Diunggah')
                                     ->dateTime()
                                     ->since()
                                     ->placeholder('Not submitted yet'),
                                 Infolists\Components\TextEntry::make('days_waiting')
-                                    ->label('⏰ Days Waiting')
+                                    ->label('⏰ Jumlah Hari selama Diproses')
                                     ->getStateUsing(fn($record) => $record->submitted_at ? now()->diffInDays($record->submitted_at) . ' days' : '0 days')
                                     ->badge()
                                     ->color(fn($state) => (int)filter_var($state, FILTER_SANITIZE_NUMBER_INT) > 7 ? 'danger' : 'success'),
@@ -793,11 +853,12 @@ class MyApprovalResource extends Resource
                                     ->label('📅 Date')
                                     ->dateTime()
                                     ->since()
-                                    ->placeholder('⏳ Pending'),
+                                    ->formatStateUsing(fn ($state) => $state ? $state->diffForHumans() : '⏳ Pending'),
                                 Infolists\Components\TextEntry::make('comments')
                                     ->label('💬 Comments')
-                                    ->placeholder('No comments')
-                                    ->limit(50),
+                                    ->limit(50)
+                                    ->formatStateUsing(fn ($state) => $state ?: 'No comments')
+                                    ->tooltip(fn($state) => $state),
                             ])
                             ->columns(5),
                     ]),
@@ -929,8 +990,9 @@ class MyApprovalResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListMyApprovals::route('/'),
-            'view' => Pages\ViewMyApproval::route('/{record}'),
+            'index'     => Pages\ListMyApprovals::route('/'),
+            'view'      => Pages\ViewMyApproval::route('/{record}'),
+            'view_ao'   => Pages\PendingAgreementOverview::route('/{record}/ao')
         ];
     }
 

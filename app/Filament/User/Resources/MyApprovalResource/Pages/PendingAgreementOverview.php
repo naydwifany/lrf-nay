@@ -1,9 +1,13 @@
 <?php
-// app/Filament/User/Resources/PendingAgreementOverviewResource.php
+// app/Filament/User/Resources/MyApprovalResource/Pages/PendingAgreementOverview.php
 
-namespace App\Filament\User\Resources;
+namespace App\Filament\User\Resources\MyApprovalResource\Pages;
 
-use App\Filament\User\Resources\PendingAgreementOverviewResource\Pages;
+use Filament\Resources\Pages\Page;
+use App\Filament\User\Resources\MyApprovalResource\Pages\PendingAgreementOverviews\ListPendingAgreementOverviews;
+use App\Filament\User\Resources\MyApprovalResource\Pages\PendingAgreementOverviews\ViewPendingAgreementOverview;
+use App\Filament\User\Resources\MyApprovalResource\Pages\PendingAgreementOverviews\CreatePendingAgreementOverview;
+use App\Filament\User\Resources\MyApprovalResource\Pages\PendingAgreementOverviews\EditPendingAgreementOverview;
 use App\Models\AgreementOverview;
 use App\Services\DocumentWorkflowService;
 use Filament\Forms;
@@ -17,7 +21,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Notifications\Notification;
 
-class PendingAgreementOverviewResource extends Resource
+class PendingAgreementOverview extends Page
 {
     protected static ?string $model = AgreementOverview::class;
     protected static ?string $navigationIcon = 'heroicon-o-clock';
@@ -64,41 +68,43 @@ class PendingAgreementOverviewResource extends Resource
             ->latest('submitted_at');
     }
 
-    public static function form(Form $form): Form
+    public function getFormSchema(): array
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Approval Decision')
-                    ->schema([
-                        Forms\Components\Radio::make('approval_decision')
-                            ->label('Decision')
-                            ->options(function () {
-                                $user = auth()->user();
+        return [
+            Forms\Components\Section::make('Approval Decision')
+                ->schema([
+                    Forms\Components\Section::make('Approval Decision')
+                        ->schema([
+                            Forms\Components\Radio::make('approval_decision')
+                                ->label('Decision')
+                                ->options(function () {
+                                    $user = auth()->user();
 
-                                // Default opsi untuk semua role
-                                $options = [
-                                    'approve' => 'Approve',
-                                    'reject' => 'Reject',
-                                ];
+                                    // Default opsi untuk semua role
+                                    $options = [
+                                        'approve' => 'Approve',
+                                        'reject' => 'Reject',
+                                    ];
 
-                                // Kalau role director1 atau director2, tambahkan opsi re-discussion
-                                if (in_array($user->role, ['director1', 'director2'])) {
-                                    $options['rediscuss'] = 'Send to Re-discussion';
-                                }
+                                    // Kalau role director1 atau director2, tambahkan opsi re-discussion
+                                    if (in_array($user->role, ['director1', 'director2'])) {
+                                        $options['rediscuss'] = 'Send to Re-discussion';
+                                    }
 
-                                return $options;
-                            })
-                            ->required()
-                            ->reactive()
-                            ->default('approve'),
-                        
-                        Forms\Components\Textarea::make('approval_comments')
-                            ->label('Comments')
-                            ->rows(3)
-                            ->required(fn (callable $get) => in_array($get('approval_decision'), ['reject', 'rediscuss']))
-                            ->placeholder('Please provide your feedback or reason for this decision...'),
-                    ]),
-            ]);
+                                    return $options;
+                                })
+                                ->required()
+                                ->reactive()
+                                ->default('approve'),
+                            
+                            Forms\Components\Textarea::make('approval_comments')
+                                ->label('Comments')
+                                ->rows(3)
+                                ->required(fn (callable $get) => in_array($get('approval_decision'), ['reject', 'rediscuss']))
+                                ->placeholder('Please provide your feedback or reason for this decision...'),
+                        ]),
+                ])
+        ];
     }
 
     public static function table(Table $table): Table
@@ -655,8 +661,10 @@ class PendingAgreementOverviewResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPendingAgreementOverviews::route('/'),
-            'view' => Pages\ViewPendingAgreementOverview::route('/{record}'),
+        'index'  => ListPendingAgreementOverviews::route('/'),
+        'view'   => ViewPendingAgreementOverview::route('/{record}'),
+        'create' => CreatePendingAgreementOverview::route('/create'),
+        'edit'   => EditPendingAgreementOverview::route('/{record}/edit'),
         ];
     }
 }

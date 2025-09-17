@@ -2,9 +2,13 @@
 // app/Filament/User/Resources/MyAgreementOverviewResource.php
 // UPDATED VERSION WITH FIXED FORM AND SERVICE INTEGRATION
 
-namespace App\Filament\User\Resources;
+namespace App\Filament\User\Resources\MyDocumentRequestResource\Pages;
 
-use App\Filament\User\Resources\MyAgreementOverviewResource\Pages;
+use Filament\Resources\Pages\Page;
+use App\Filament\User\Resources\MyDocumentRequestResource\Pages\MyAgreementOverviews\ListMyAgreementOverview;
+use App\Filament\User\Resources\MyDocumentRequestResource\Pages\MyAgreementOverviews\ViewMyAgreementOverview;
+use App\Filament\User\Resources\MyDocumentRequestResource\Pages\MyAgreementOverviews\CreateMyAgreementOverview;
+use App\Filament\User\Resources\MyDocumentRequestResource\Pages\MyAgreementOverviews\EditMyAgreementOverview;
 use App\Models\AgreementOverview;
 use App\Models\DocumentRequest;
 use App\Traits\DirectorManagementTrait;
@@ -19,7 +23,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Support\Enums\FontWeight;
 
-class MyAgreementOverviewResource extends Resource
+class MyAgreementOverview extends Page
 {
     use DirectorManagementTrait;
     
@@ -42,220 +46,222 @@ class MyAgreementOverviewResource extends Resource
             ->where('creator_nik', auth()->user()->nik);
     }
 
-    public static function form(Form $form): Form
+    public function getFormSchema(): array
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Agreement Overview Information')
-                    ->schema([
-                        // FIXED: Properly handle both field possibilities
-                        Forms\Components\Select::make('document_request_id')
-                            ->label('Source Document Request')
-                            ->options(function () {
-                                return DocumentRequest::where('nik', auth()->user()->nik)
-                                    ->where('status', 'agreement_creation')
-                                    ->whereDoesntHave('agreementOverview')
-                                    ->get()
-                                    ->mapWithKeys(function ($doc) {
-                                        $label = ($doc->nomor_dokumen ?? 'No Number') . ' - ' . ($doc->title ?? 'No Title');
-                                        return [$doc->id => $label];
-                                    })
-                                    ->toArray();
-                            })
-                            ->searchable()
-                            ->preload()
-                            ->required()
-                            ->disabled(fn ($livewire) => $livewire instanceof \Filament\Resources\Pages\EditRecord)
-                            ->helperText('Select the document request this agreement is based on'),
-                            
-                        Forms\Components\TextInput::make('nomor_dokumen')
-                            ->label('Agreement Number')
-                            ->maxLength(255)
-                            ->disabled()
-                            ->helperText('Will be auto-generated if left empty'),
-                            
-                        Forms\Components\DatePicker::make('tanggal_ao')
-                            ->label('Agreement Overview Date')
-                            ->default(now())
-                            ->required(),
-                            
-                        Forms\Components\TextInput::make('pic')
-                            ->label('PIC (Person In Charge)')
-                            ->default(auth()->user()->name)
-                            ->required()
-                            ->maxLength(255),
-                    ])->columns(2),
+        return [
+            Forms\Components\Section::make('Approval Decision')
+                ->schema([
+                    Forms\Components\Section::make('Agreement Overview Information')
+                        ->schema([
+                            // FIXED: Properly handle both field possibilities
+                            Forms\Components\Select::make('document_request_id')
+                                ->label('Source Document Request')
+                                ->options(function () {
+                                    return DocumentRequest::where('nik', auth()->user()->nik)
+                                        ->where('status', 'agreement_creation')
+                                        ->whereDoesntHave('agreementOverview')
+                                        ->get()
+                                        ->mapWithKeys(function ($doc) {
+                                            $label = ($doc->nomor_dokumen ?? 'No Number') . ' - ' . ($doc->title ?? 'No Title');
+                                            return [$doc->id => $label];
+                                        })
+                                        ->toArray();
+                                })
+                                ->searchable()
+                                ->preload()
+                                ->required()
+                                ->disabled(fn ($livewire) => $livewire instanceof \Filament\Resources\Pages\EditRecord)
+                                ->helperText('Select the document request this agreement is based on'),
+                                
+                            Forms\Components\TextInput::make('nomor_dokumen')
+                                ->label('Agreement Number')
+                                ->maxLength(255)
+                                ->disabled()
+                                ->helperText('Will be auto-generated if left empty'),
+                                
+                            Forms\Components\DatePicker::make('tanggal_ao')
+                                ->label('Agreement Overview Date')
+                                ->default(now())
+                                ->required(),
+                                
+                            Forms\Components\TextInput::make('pic')
+                                ->label('PIC (Person In Charge)')
+                                ->default(auth()->user()->name)
+                                ->required()
+                                ->maxLength(255),
+                        ])->columns(2),
 
-                Forms\Components\Section::make('Counterparty Information')
-                    ->schema([
-                        Forms\Components\TextInput::make('counterparty')
-                            ->label('Counterparty Name')
-                            ->required()
-                            ->maxLength(255),
+                    Forms\Components\Section::make('Counterparty Information')
+                        ->schema([
+                            Forms\Components\TextInput::make('counterparty')
+                                ->label('Counterparty Name')
+                                ->required()
+                                ->maxLength(255),
+                                
+                            Forms\Components\Textarea::make('deskripsi')
+                                ->label('Agreement Description')
+                                ->rows(3)
+                                ->required()
+                                ->columnSpanFull(),
+                        ])->columns(2),
+
+                    Forms\Components\Section::make('Director Selection')
+                        ->schema([
+                            Forms\Components\TextInput::make('director1_name')
+                                ->label('Director 1 (Auto-assigned)')
+                                ->helperText('Automatically assigned from your supervisor line')
+                                ->disabled()
+                                ->dehydrated(false),
+                                
+                            Forms\Components\Select::make('director2_nik')
+                                ->label('Select Director 2')
+                                ->options(static::getAvailableDirectors())
+                                ->searchable()
+                                ->required()
+                                ->reactive()
+                                ->helperText('Choose second director for this agreement')
+                                ->afterStateUpdated(function ($state, callable $set) {
+                                    if ($state) {
+                                        $director2 = static::getDirector2Details($state);
+                                        $set('director2_name', $director2['name']);
+                                        
+                                        \Log::info('AO Form Director2 Selection', [
+                                            'selected_nik' => $state,
+                                            'director_data' => $director2
+                                        ]);
+                                    }
+                                }),
+                        ])->columns(2),
+
+                    Forms\Components\Section::make('Agreement Period')
+                        ->schema([
+                            Forms\Components\DatePicker::make('start_date_jk')
+                                ->label('Agreement Start Date')
+                                ->required(),
+                                
+                            Forms\Components\DatePicker::make('end_date_jk')
+                                ->label('Agreement End Date')
+                                ->required()
+                                ->after('start_date_jk'),
+                        ])->columns(2),
+
+                    Forms\Components\Section::make('Agreement Content')
+                        ->schema([
+                            Forms\Components\RichEditor::make('resume')
+                                ->label('Executive Summary')
+                                ->required()
+                                ->columnSpanFull()
+                                ->helperText('Provide a comprehensive summary of the agreement')
+                                ->toolbarButtons([
+                                    'bold', 'italic', 'underline', 'strike',
+                                    'bulletList', 'orderedList',
+                                    'h2', 'h3', 'paragraph',
+                                    'undo', 'redo'
+                                ]),
+                                
+                            Forms\Components\RichEditor::make('ketentuan_dan_mekanisme')
+                                ->label('Terms and Mechanisms')
+                                ->required()
+                                ->columnSpanFull()
+                                ->helperText('Detail the key terms and operational mechanisms')
+                                ->toolbarButtons([
+                                    'bold', 'italic', 'underline', 'strike',
+                                    'bulletList', 'orderedList',
+                                    'h2', 'h3', 'paragraph',
+                                    'undo', 'redo'
+                                ]),
+                        ]),
+
+                    Forms\Components\Section::make('Parties Information')
+                        ->schema([
+                            Forms\Components\Repeater::make('parties')
+                                ->schema([
+                                    Forms\Components\TextInput::make('name')
+                                        ->required()
+                                        ->label('Party Name'),
+                                        
+                                    Forms\Components\Select::make('type')
+                                        ->options([
+                                            'company' => 'Company',
+                                            'individual' => 'Individual',
+                                            'government' => 'Government Entity',
+                                            'ngo' => 'NGO',
+                                        ])
+                                        ->required(),
+                                        
+                                    Forms\Components\Textarea::make('address')
+                                        ->rows(2)
+                                        ->label('Address'),
+                                        
+                                    Forms\Components\TextInput::make('contact_person')
+                                        ->label('Contact Person'),
+                                        
+                                    Forms\Components\TextInput::make('email')
+                                        ->email()
+                                        ->label('Email'),
+                                        
+                                    Forms\Components\TextInput::make('phone')
+                                        ->label('Phone Number'),
+                                ])
+                                ->columns(3)
+                                ->defaultItems(2)
+                                ->columnSpanFull()
+                                ->addActionLabel('Add Party')
+                                ->collapsible(),
+                        ]),
+
+                    Forms\Components\Section::make('Key Terms & Risks')
+                        ->schema([
+                            Forms\Components\Repeater::make('terms')
+                                ->schema([
+                                    Forms\Components\TextInput::make('key')
+                                        ->label('Term/Condition')
+                                        ->required(),
+                                        
+                                    Forms\Components\Textarea::make('value')
+                                        ->label('Description')
+                                        ->required()
+                                        ->rows(2),
+                                ])
+                                ->columns(2)
+                                ->columnSpanFull()
+                                ->label('Key Terms & Conditions')
+                                ->addActionLabel('Add Term')
+                                ->collapsible(),
                             
-                        Forms\Components\Textarea::make('deskripsi')
-                            ->label('Agreement Description')
-                            ->rows(3)
-                            ->required()
-                            ->columnSpanFull(),
-                    ])->columns(2),
+                            Forms\Components\Repeater::make('risks')
+                                ->schema([
+                                    Forms\Components\TextInput::make('key')
+                                        ->label('Risk Item')
+                                        ->required(),
+                                        
+                                    Forms\Components\Textarea::make('value')
+                                        ->label('Mitigation Strategy')
+                                        ->required()
+                                        ->rows(2),
+                                ])
+                                ->columns(2)
+                                ->columnSpanFull()
+                                ->label('Identified Risks & Mitigation')
+                                ->addActionLabel('Add Risk')
+                                ->collapsible(),
+                        ]),
 
-                Forms\Components\Section::make('Director Selection')
-                    ->schema([
-                        Forms\Components\TextInput::make('director1_name')
-                            ->label('Director 1 (Auto-assigned)')
-                            ->helperText('Automatically assigned from your supervisor line')
-                            ->disabled()
-                            ->dehydrated(false),
-                            
-                        Forms\Components\Select::make('director2_nik')
-                            ->label('Select Director 2')
-                            ->options(static::getAvailableDirectors())
-                            ->searchable()
-                            ->required()
-                            ->reactive()
-                            ->helperText('Choose second director for this agreement')
-                            ->afterStateUpdated(function ($state, callable $set) {
-                                if ($state) {
-                                    $director2 = static::getDirector2Details($state);
-                                    $set('director2_name', $director2['name']);
-                                    
-                                    \Log::info('AO Form Director2 Selection', [
-                                        'selected_nik' => $state,
-                                        'director_data' => $director2
-                                    ]);
-                                }
-                            }),
-                    ])->columns(2),
-
-                Forms\Components\Section::make('Agreement Period')
-                    ->schema([
-                        Forms\Components\DatePicker::make('start_date_jk')
-                            ->label('Agreement Start Date')
-                            ->required(),
-                            
-                        Forms\Components\DatePicker::make('end_date_jk')
-                            ->label('Agreement End Date')
-                            ->required()
-                            ->after('start_date_jk'),
-                    ])->columns(2),
-
-                Forms\Components\Section::make('Agreement Content')
-                    ->schema([
-                        Forms\Components\RichEditor::make('resume')
-                            ->label('Executive Summary')
-                            ->required()
-                            ->columnSpanFull()
-                            ->helperText('Provide a comprehensive summary of the agreement')
-                            ->toolbarButtons([
-                                'bold', 'italic', 'underline', 'strike',
-                                'bulletList', 'orderedList',
-                                'h2', 'h3', 'paragraph',
-                                'undo', 'redo'
-                            ]),
-                            
-                        Forms\Components\RichEditor::make('ketentuan_dan_mekanisme')
-                            ->label('Terms and Mechanisms')
-                            ->required()
-                            ->columnSpanFull()
-                            ->helperText('Detail the key terms and operational mechanisms')
-                            ->toolbarButtons([
-                                'bold', 'italic', 'underline', 'strike',
-                                'bulletList', 'orderedList',
-                                'h2', 'h3', 'paragraph',
-                                'undo', 'redo'
-                            ]),
-                    ]),
-
-                Forms\Components\Section::make('Parties Information')
-                    ->schema([
-                        Forms\Components\Repeater::make('parties')
-                            ->schema([
-                                Forms\Components\TextInput::make('name')
-                                    ->required()
-                                    ->label('Party Name'),
-                                    
-                                Forms\Components\Select::make('type')
-                                    ->options([
-                                        'company' => 'Company',
-                                        'individual' => 'Individual',
-                                        'government' => 'Government Entity',
-                                        'ngo' => 'NGO',
-                                    ])
-                                    ->required(),
-                                    
-                                Forms\Components\Textarea::make('address')
-                                    ->rows(2)
-                                    ->label('Address'),
-                                    
-                                Forms\Components\TextInput::make('contact_person')
-                                    ->label('Contact Person'),
-                                    
-                                Forms\Components\TextInput::make('email')
-                                    ->email()
-                                    ->label('Email'),
-                                    
-                                Forms\Components\TextInput::make('phone')
-                                    ->label('Phone Number'),
-                            ])
-                            ->columns(3)
-                            ->defaultItems(2)
-                            ->columnSpanFull()
-                            ->addActionLabel('Add Party')
-                            ->collapsible(),
-                    ]),
-
-                Forms\Components\Section::make('Key Terms & Risks')
-                    ->schema([
-                        Forms\Components\Repeater::make('terms')
-                            ->schema([
-                                Forms\Components\TextInput::make('key')
-                                    ->label('Term/Condition')
-                                    ->required(),
-                                    
-                                Forms\Components\Textarea::make('value')
-                                    ->label('Description')
-                                    ->required()
-                                    ->rows(2),
-                            ])
-                            ->columns(2)
-                            ->columnSpanFull()
-                            ->label('Key Terms & Conditions')
-                            ->addActionLabel('Add Term')
-                            ->collapsible(),
-                        
-                        Forms\Components\Repeater::make('risks')
-                            ->schema([
-                                Forms\Components\TextInput::make('key')
-                                    ->label('Risk Item')
-                                    ->required(),
-                                    
-                                Forms\Components\Textarea::make('value')
-                                    ->label('Mitigation Strategy')
-                                    ->required()
-                                    ->rows(2),
-                            ])
-                            ->columns(2)
-                            ->columnSpanFull()
-                            ->label('Identified Risks & Mitigation')
-                            ->addActionLabel('Add Risk')
-                            ->collapsible(),
-                    ]),
-
-                // Hidden fields - auto-filled
-                Forms\Components\Hidden::make('nik'),
-                Forms\Components\Hidden::make('nama'),
-                Forms\Components\Hidden::make('jabatan'),
-                Forms\Components\Hidden::make('divisi'),
-                Forms\Components\Hidden::make('direktorat'),
-                Forms\Components\Hidden::make('level'),
-                Forms\Components\Hidden::make('director1_nik'),
-                Forms\Components\Hidden::make('director1_name'),
-                Forms\Components\Hidden::make('director2_nik'),
-                Forms\Components\Hidden::make('director2_name'),
-                Forms\Components\Hidden::make('is_draft'),
-                Forms\Components\Hidden::make('status'),
-            ]);
+                    // Hidden fields - auto-filled
+                    Forms\Components\Hidden::make('nik'),
+                    Forms\Components\Hidden::make('nama'),
+                    Forms\Components\Hidden::make('jabatan'),
+                    Forms\Components\Hidden::make('divisi'),
+                    Forms\Components\Hidden::make('direktorat'),
+                    Forms\Components\Hidden::make('level'),
+                    Forms\Components\Hidden::make('director1_nik'),
+                    Forms\Components\Hidden::make('director1_name'),
+                    Forms\Components\Hidden::make('director2_nik'),
+                    Forms\Components\Hidden::make('director2_name'),
+                    Forms\Components\Hidden::make('is_draft'),
+                    Forms\Components\Hidden::make('status'),
+                ])
+        ];
     }
 
     public static function table(Table $table): Table
@@ -629,10 +635,10 @@ class MyAgreementOverviewResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListMyAgreementOverviews::route('/'),
-            'create' => Pages\CreateMyAgreementOverview::route('/create'),
-            'view' => Pages\ViewMyAgreementOverview::route('/{record}'),
-            'edit' => Pages\EditMyAgreementOverview::route('/{record}/edit'),
+        'index'  => ListMyAgreementOverview::route('/'),
+        'view'   => ViewMyAgreementOverview::route('/{record}'),
+        'create' => CreateMyAgreementOverview::route('/create'),
+        'edit'   => EditMyAgreementOverview::route('/{record}/edit'),
         ];
     }
 

@@ -1,9 +1,9 @@
 <?php
 // app/Filament/User/Resources/MyAgreementOverviewResource/Pages/CreateMyAgreementOverview.php
 
-namespace App\Filament\User\Resources\MyAgreementOverviewResource\Pages;
+namespace App\Filament\User\Resources\MyDocumentRequestResource\Pages\MyAgreementOverviews;
 
-use App\Filament\User\Resources\MyAgreementOverviewResource;
+use App\Filament\User\Resources\MyDocumentRequestResource;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Notifications\Notification;
@@ -13,7 +13,7 @@ class CreateMyAgreementOverview extends CreateRecord
 {
     use DirectorManagementTrait;
     
-    protected static string $resource = MyAgreementOverviewResource::class;
+    protected static string $resource = MyDocumentRequestResource::class;
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {

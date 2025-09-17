@@ -1,9 +1,13 @@
 <?php
-// app/Filament/Admin/Resources/AgreementOverviewResource.php
+// app/Filament/Admin/Resources/DocumentRequestResource\Pages\AgreementOverviews.php
 
-namespace App\Filament\Admin\Resources;
+namespace App\Filament\Admin\Resources\DocumentRequestResource\Pages;
 
-use App\Filament\Admin\Resources\AgreementOverviewResource\Pages;
+use Filament\Resources\Pages\Page;
+use App\Filament\Admin\Resources\DocumentRequestResource\Pages\AgreementOverviews\ListAgreementOverview;
+use App\Filament\Admin\Resources\DocumentRequestResource\Pages\AgreementOverviews\ViewAgreementOverview;
+use App\Filament\Admin\Resources\DocumentRequestResource\Pages\AgreementOverviews\CreateAgreementOverview;
+use App\Filament\Admin\Resources\DocumentRequestResource\Pages\AgreementOverviews\EditAgreementOverview;
 use App\Models\AgreementOverview;
 use App\Models\DocumentApproval;
 use App\Services\DocumentWorkflowService;
@@ -20,7 +24,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Notifications\Notification;
 use Filament\Support\Enums\FontWeight;
 
-class AgreementOverviewResource extends Resource
+class AgreementOverviews extends Page
 {
     protected static ?string $model = AgreementOverview::class;
     protected static ?string $navigationIcon = 'heroicon-o-document-duplicate';
@@ -28,153 +32,155 @@ class AgreementOverviewResource extends Resource
     protected static ?int $navigationSort = 1;
     protected static ?string $recordTitleAttribute = 'nomor_dokumen';
 
-    public static function form(Form $form): Form
+    public function getFormSchema(): array
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Agreement Overview Information')
-                    ->schema([
-                        Forms\Components\Select::make('document_request_id')
-                            ->relationship('documentRequest', 'title')
-                            ->searchable()
-                            ->preload()
-                            ->required(),
-                        Forms\Components\TextInput::make('nomor_dokumen')
-                            ->label('Document Number')
-                            ->required()
-                            ->maxLength(255),
-                        Forms\Components\DatePicker::make('tanggal_ao')
-                            ->label('Agreement Overview Date')
-                            ->required(),
-                        Forms\Components\TextInput::make('pic')
-                            ->label('PIC (Person In Charge)')
-                            ->required()
-                            ->maxLength(255),
-                    ])->columns(2),
+        return [
+            Forms\Components\Section::make('Approval Decision')
+                ->schema([
+                    Forms\Components\Section::make('Agreement Overview Information')
+                        ->schema([
+                            Forms\Components\Select::make('document_request_id')
+                                ->relationship('documentRequest', 'title')
+                                ->searchable()
+                                ->preload()
+                                ->required(),
+                            Forms\Components\TextInput::make('nomor_dokumen')
+                                ->label('Document Number')
+                                ->required()
+                                ->maxLength(255),
+                            Forms\Components\DatePicker::make('tanggal_ao')
+                                ->label('Agreement Overview Date')
+                                ->required(),
+                            Forms\Components\TextInput::make('pic')
+                                ->label('PIC (Person In Charge)')
+                                ->required()
+                                ->maxLength(255),
+                        ])->columns(2),
 
-                Forms\Components\Section::make('User Information')
-                    ->schema([
-                        Forms\Components\TextInput::make('nik')
-                            ->label('NIK')
-                            ->required()
-                            ->maxLength(50),
-                        Forms\Components\TextInput::make('nama')
-                            ->label('Name')
-                            ->required()
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('jabatan')
-                            ->label('Position')
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('divisi')
-                            ->label('Division')
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('direktorat')
-                            ->label('Directorate')
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('level')
-                            ->label('Level')
-                            ->maxLength(50),
-                    ])->columns(3),
+                    Forms\Components\Section::make('User Information')
+                        ->schema([
+                            Forms\Components\TextInput::make('nik')
+                                ->label('NIK')
+                                ->required()
+                                ->maxLength(50),
+                            Forms\Components\TextInput::make('nama')
+                                ->label('Name')
+                                ->required()
+                                ->maxLength(255),
+                            Forms\Components\TextInput::make('jabatan')
+                                ->label('Position')
+                                ->maxLength(255),
+                            Forms\Components\TextInput::make('divisi')
+                                ->label('Division')
+                                ->maxLength(255),
+                            Forms\Components\TextInput::make('direktorat')
+                                ->label('Directorate')
+                                ->maxLength(255),
+                            Forms\Components\TextInput::make('level')
+                                ->label('Level')
+                                ->maxLength(50),
+                        ])->columns(3),
 
-                Forms\Components\Section::make('Counterparty & Description')
-                    ->schema([
-                        Forms\Components\TextInput::make('counterparty')
-                            ->label('Counterparty')
-                            ->required()
-                            ->maxLength(255),
-                        Forms\Components\Textarea::make('deskripsi')
-                            ->label('Description')
-                            ->rows(3)
-                            ->columnSpanFull(),
-                    ])->columns(2),
+                    Forms\Components\Section::make('Counterparty & Description')
+                        ->schema([
+                            Forms\Components\TextInput::make('counterparty')
+                                ->label('Counterparty')
+                                ->required()
+                                ->maxLength(255),
+                            Forms\Components\Textarea::make('deskripsi')
+                                ->label('Description')
+                                ->rows(3)
+                                ->columnSpanFull(),
+                        ])->columns(2),
 
-                Forms\Components\Section::make('Director Information')
-                    ->schema([
-                        Forms\Components\TextInput::make('nama_direksi_default')
-                            ->label('Default Director Name')
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('nama_direksi')
-                            ->label('Selected Director Name')
-                            ->maxLength(255),
-                        Forms\Components\TextInput::make('nik_direksi')
-                            ->label('Director NIK')
-                            ->maxLength(50),
-                    ])->columns(3),
+                    Forms\Components\Section::make('Director Information')
+                        ->schema([
+                            Forms\Components\TextInput::make('nama_direksi_default')
+                                ->label('Default Director Name')
+                                ->maxLength(255),
+                            Forms\Components\TextInput::make('nama_direksi')
+                                ->label('Selected Director Name')
+                                ->maxLength(255),
+                            Forms\Components\TextInput::make('nik_direksi')
+                                ->label('Director NIK')
+                                ->maxLength(50),
+                        ])->columns(3),
 
-                Forms\Components\Section::make('Agreement Period')
-                    ->schema([
-                        Forms\Components\DatePicker::make('start_date_jk')
-                            ->label('Start Date')
-                            ->required(),
-                        Forms\Components\DatePicker::make('end_date_jk')
-                            ->label('End Date')
-                            ->required()
-                            ->after('start_date_jk'),
-                    ])->columns(2),
+                    Forms\Components\Section::make('Agreement Period')
+                        ->schema([
+                            Forms\Components\DatePicker::make('start_date_jk')
+                                ->label('Start Date')
+                                ->required(),
+                            Forms\Components\DatePicker::make('end_date_jk')
+                                ->label('End Date')
+                                ->required()
+                                ->after('start_date_jk'),
+                        ])->columns(2),
 
-                Forms\Components\Section::make('Agreement Details')
-                    ->schema([
-                        Forms\Components\RichEditor::make('resume')
-                            ->label('Resume/Summary')
-                            ->columnSpanFull(),
-                        Forms\Components\RichEditor::make('ketentuan_dan_mekanisme')
-                            ->label('Terms and Mechanisms')
-                            ->columnSpanFull(),
-                    ]),
+                    Forms\Components\Section::make('Agreement Details')
+                        ->schema([
+                            Forms\Components\RichEditor::make('resume')
+                                ->label('Resume/Summary')
+                                ->columnSpanFull(),
+                            Forms\Components\RichEditor::make('ketentuan_dan_mekanisme')
+                                ->label('Terms and Mechanisms')
+                                ->columnSpanFull(),
+                        ]),
 
-                Forms\Components\Section::make('Parties, Terms & Risks')
-                    ->schema([
-                        Forms\Components\Repeater::make('parties')
-                            ->schema([
-                                Forms\Components\TextInput::make('name')
-                                    ->required()
-                                    ->label('Party Name'),
-                                Forms\Components\Select::make('type')
-                                    ->options([
-                                        'company' => 'Company',
-                                        'individual' => 'Individual',
-                                        'government' => 'Government Entity',
-                                        'ngo' => 'NGO',
-                                    ])
-                                    ->required(),
-                                Forms\Components\Textarea::make('address')
-                                    ->rows(2),
-                                Forms\Components\TextInput::make('contact_person'),
-                            ])
-                            ->columns(2)
-                            ->defaultItems(2)
-                            ->columnSpanFull(),
-                        
-                        Forms\Components\KeyValue::make('terms')
-                            ->label('Key Terms')
-                            ->columnSpanFull(),
-                        
-                        Forms\Components\KeyValue::make('risks')
-                            ->label('Identified Risks')
-                            ->columnSpanFull(),
-                    ]),
+                    Forms\Components\Section::make('Parties, Terms & Risks')
+                        ->schema([
+                            Forms\Components\Repeater::make('parties')
+                                ->schema([
+                                    Forms\Components\TextInput::make('name')
+                                        ->required()
+                                        ->label('Party Name'),
+                                    Forms\Components\Select::make('type')
+                                        ->options([
+                                            'company' => 'Company',
+                                            'individual' => 'Individual',
+                                            'government' => 'Government Entity',
+                                            'ngo' => 'NGO',
+                                        ])
+                                        ->required(),
+                                    Forms\Components\Textarea::make('address')
+                                        ->rows(2),
+                                    Forms\Components\TextInput::make('contact_person'),
+                                ])
+                                ->columns(2)
+                                ->defaultItems(2)
+                                ->columnSpanFull(),
+                            
+                            Forms\Components\KeyValue::make('terms')
+                                ->label('Key Terms')
+                                ->columnSpanFull(),
+                            
+                            Forms\Components\KeyValue::make('risks')
+                                ->label('Identified Risks')
+                                ->columnSpanFull(),
+                        ]),
 
-                Forms\Components\Section::make('Status & Control')
-                    ->schema([
-                        Forms\Components\Select::make('status')
-                            ->options([
-                                'draft' => 'Draft',
-                                'submitted' => 'Submitted',
-                                'pending_approval' => 'Pending Approval',
-                                'approved' => 'Approved',
-                                'rejected' => 'Rejected',
-                            ])
-                            ->default('draft')
-                            ->required(),
-                        Forms\Components\Toggle::make('is_draft')
-                            ->label('Is Draft')
-                            ->default(true),
-                        Forms\Components\DateTimePicker::make('submitted_at')
-                            ->label('Submitted At'),
-                        Forms\Components\DateTimePicker::make('completed_at')
-                            ->label('Completed At'),
-                    ])->columns(2),
-            ]);
+                    Forms\Components\Section::make('Status & Control')
+                        ->schema([
+                            Forms\Components\Select::make('status')
+                                ->options([
+                                    'draft' => 'Draft',
+                                    'submitted' => 'Submitted',
+                                    'pending_approval' => 'Pending Approval',
+                                    'approved' => 'Approved',
+                                    'rejected' => 'Rejected',
+                                ])
+                                ->default('draft')
+                                ->required(),
+                            Forms\Components\Toggle::make('is_draft')
+                                ->label('Is Draft')
+                                ->default(true),
+                            Forms\Components\DateTimePicker::make('submitted_at')
+                                ->label('Submitted At'),
+                            Forms\Components\DateTimePicker::make('completed_at')
+                                ->label('Completed At'),
+                        ])->columns(2),
+                ])
+            ];
     }
 
     public static function table(Table $table): Table
@@ -670,8 +676,8 @@ class AgreementOverviewResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListAgreementOverviews::route('/'),
-            'view' => Pages\ViewAgreementOverview::route('/{record}'),
+        'index'  => ListAgreementOverview::route('/'),
+        'view'   => ViewAgreementOverview::route('/{record}'),
         ];
     }
 }
