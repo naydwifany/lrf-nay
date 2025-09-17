@@ -380,6 +380,15 @@ public function canCloseDiscussion(?User $user = null): bool
 
     public function getComputedStatusAttribute(): string
     {
+        // Kalau status masih 'submitted', ubah ke 'pending_supervisor'
+        if ($this->status === 'submitted') {
+            return 'pending_supervisor';
+        }
+
+        // kalau ada status AO → pakai itu
+        if ($this->ao_status) {
+            return $this->ao_status;
+        }
         return app(\App\Services\DocumentWorkflowService::class)
             ->getDocumentStatus($this);
     }

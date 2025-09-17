@@ -32,7 +32,7 @@ class MasterDocument extends Model
         'optional_fields' => 'json',
         'notification_settings' => 'json',
         'enable_notifications' => 'boolean',
-        'notification_recipients' => 'json'
+        'notification_recipients' => 'array',
     ];
 
     // Relationships

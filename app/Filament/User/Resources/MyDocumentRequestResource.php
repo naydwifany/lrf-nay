@@ -377,37 +377,62 @@ class MyDocumentRequestResource extends Resource
                         'info'    => 'pending_gm',
                         'primary' => ['pending_legal', 'pending_legal_admin'],
                         'gray'    => 'submitted',
-
-                        // AO stages
                         'purple'  => \App\Models\AgreementOverview::STATUS_PENDING_HEAD,
                         'success' => \App\Models\AgreementOverview::STATUS_APPROVED,
                         'danger'  => \App\Models\AgreementOverview::STATUS_REJECTED,
                     ])
                     ->formatStateUsing(function ($state, $record) {
-                        // sekarang $state sudah computed_status (bisa AO / docreq)
-                        return match ($state) {
-                            \App\Models\AgreementOverview::STATUS_DRAFT             => 'AO Draft',
-                            \App\Models\AgreementOverview::STATUS_PENDING_HEAD      => 'AO - Pending Head',
-                            \App\Models\AgreementOverview::STATUS_PENDING_GM        => 'AO - Pending GM',
-                            \App\Models\AgreementOverview::STATUS_PENDING_FINANCE   => 'AO - Pending Finance',
-                            \App\Models\AgreementOverview::STATUS_PENDING_LEGAL     => 'AO - Pending Legal',
-                            \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR1 => 'AO - Pending Director 1',
-                            \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR2 => 'AO - Pending Director 2',
-                            \App\Models\AgreementOverview::STATUS_APPROVED          => 'AO Approved',
-                            \App\Models\AgreementOverview::STATUS_REJECTED          => 'AO Rejected',
-                            \App\Models\AgreementOverview::STATUS_REDISCUSS         => 'AO Back to Discussion',
+                        if (empty($state)) {
+                            return null;
+                        }
 
+                        // kalau sudah berhasil create docreq → milestone Ready for AO
+                        if ($state === 'agreement_creation') {
+                            return '✅ Ready for AO';
+                        }
+
+                        // AO flow
+                        if (str_starts_with($state, 'ao_')) {
+                            return match ($state) {
+                                \App\Models\AgreementOverview::STATUS_PENDING_HEAD      => 'AO - Pending Head Legal',
+                                \App\Models\AgreementOverview::STATUS_PENDING_GM        => 'AO - Pending GM',
+                                \App\Models\AgreementOverview::STATUS_PENDING_FINANCE   => 'AO - Pending Finance',
+                                \App\Models\AgreementOverview::STATUS_PENDING_LEGAL     => 'AO - Pending Legal',
+                                \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR1 => 'AO - Pending Director 1',
+                                \App\Models\AgreementOverview::STATUS_PENDING_DIRECTOR2 => 'AO - Pending Director 2',
+                                \App\Models\AgreementOverview::STATUS_APPROVED          => 'AO Approved',
+                                \App\Models\AgreementOverview::STATUS_REJECTED          => 'AO Rejected',
+                                \App\Models\AgreementOverview::STATUS_REDISCUSS         => 'AO Back to Discussion',
+                                default                                                 => 'AO - ' . ucwords(str_replace('_', ' ', $state)),
+                            };
+                        }
+
+                        // DocReq flow
+                        return match ($state) {
                             'pending_supervisor'   => 'Pending Supervisor',
                             'pending_gm'           => 'Pending GM',
                             'pending_legal_admin'  => 'Pending Admin Legal',
                             'pending_legal'        => 'Pending Legal',
                             'in_discussion'        => 'On Discussion Forum',
-                            'agreement_creation'   => 'Ready for AO',
                             'completed'            => 'Agreement Successful',
                             'approved'             => 'Approved',
                             'rejected'             => 'Rejected',
-                            default                => 'You haven\'t been involved yet',
+                            default                => ucwords(str_replace('_', ' ', (string) $state)),
                         };
+                    })
+                    ->placeholder('—')
+                    ->tooltip(function ($state, $record) {
+                        // tampilkan info tambahan: siapa dan kapan
+                        if ($record->current_approver_name) {
+                            return "Pending at: {$record->current_approver_name}"
+                                . ($record->updated_at ? ' since ' . $record->updated_at->format('d M Y H:i') : '');
+                        }
+
+                        if ($state === 'agreement_creation' && $record->created_at) {
+                            return "DocReq created at " . $record->created_at->format('d M Y H:i');
+                        }
+
+                        return null;
                     }),
 
                 /*
@@ -422,7 +447,7 @@ class MyDocumentRequestResource extends Resource
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Dibuat')
-                    ->date()
+                    ->dateTime('M d, Y H:i')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('is_draft')
                     ->label('Draft/Uploaded')
@@ -433,8 +458,8 @@ class MyDocumentRequestResource extends Resource
                     ]),
                 Tables\Columns\TextColumn::make('submitted_at')
                     ->label('Diunggah')
-                    ->dateTime()
-                    ->formatStateUsing(fn ($state) => $state ? $state->format('M j, Y') : 'Belum diunggah')
+                    ->dateTime('M d, Y H:i')
+                    ->formatStateUsing(fn ($state) => $state ? $state->format('M d, Y H:i') : 'Belum diunggah')
                     ->color(fn ($state) => $state ? null : 'gray')
                     ->sortable(),
             ])
@@ -1202,21 +1227,21 @@ class MyDocumentRequestResource extends Resource
                                     ->limit(30) // batasi jadi 30 karakter, sisanya diganti ...
                                     ->tooltip(fn ($record) => $record->surat_kuasa), // full text muncul di hover
                             ]),
-                    ]),
+                    ])
+                ->collapsible(),
 
                 Infolists\Components\Section::make('🗓️ Document Timeline')
                     ->schema([
                         Infolists\Components\TextEntry::make('created_at')
                             ->label('Dibuat')
-                            ->dateTime(),
+                            ->dateTime('M d, Y H:i'),
                         Infolists\Components\TextEntry::make('submitted_at')
                             ->label('Diunggah')
-                            ->dateTime()
+                            ->dateTime('M d, Y H:i')
                             ->placeholder('Not submitted'),
                         Infolists\Components\TextEntry::make('completed_at')
                             ->label('Selesai')
-                            ->dateTime()
-                            ->placeholder('Masih dalam proses.'),
+                            ->dateTime('M d, Y H:i'),
                     ])->columns(3),
 
                 // APPROVAL HISTORY
@@ -1233,7 +1258,7 @@ class MyDocumentRequestResource extends Resource
                                     ->badge(),
                                 Infolists\Components\TextEntry::make('approved_at')
                                     ->label('📅 Date')
-                                    ->dateTime()
+                                    ->dateTime('M d, Y H:i')
                                     ->placeholder('⏳ Pending'),
                                 Infolists\Components\TextEntry::make('comments')
                                     ->label('💬 Comments')

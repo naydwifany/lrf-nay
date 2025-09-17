@@ -20,37 +20,39 @@ class MasterDocumentResource extends Resource
     protected static ?string $model = MasterDocument::class;
     protected static ?string $navigationIcon = 'heroicon-o-document-check';
     protected static ?string $navigationGroup = 'Master Data';
-    protected static ?string $navigationLabel = 'Document Types';
-    protected static ?string $modelLabel = 'Document Type';
-    protected static ?string $pluralModelLabel = 'Document Types';
+    protected static ?string $navigationLabel = 'Jenis Perjanjian';
+    protected static ?string $modelLabel = 'Jenis Perjanjian';
+    protected static ?string $pluralModelLabel = 'Jenis Perjanjian';
     protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Document Type Information')
+                Forms\Components\Section::make('Informasi Jenis Perjanjian')
                     ->schema([
                         Forms\Components\TextInput::make('document_name')
-                            ->label('Document Type Name')
+                            ->label('Nama Jenis Perjanjian')
                             ->required()
                             ->maxLength(255)
-                            ->helperText('e.g., Service Agreement, Supply Contract, etc.'),
+                            ->helperText('e.g., Perjanjian Sewa Menyewa, Surat Perintah Kerja (Nilai transaksi di atas 80 juta), etc.'),
                         Forms\Components\TextInput::make('document_code')
-                            ->label('Document Code')
+                            ->label('Inisial Jenis Perjanjian')
                             ->required()
                             ->maxLength(50)
                             ->unique(ignoreRecord: true)
-                            ->helperText('Unique code for this document type (e.g., SA, SC, etc.)'),
+                            ->helperText('Kode unik untuk jenis perjanjian ini (e.g., PSM, SPK79, SPK81, etc.)'),
+                        /*
                         Forms\Components\Textarea::make('description')
-                            ->label('Description')
+                            ->label('Deskripsi (Optional)')
                             ->rows(3)
                             ->maxLength(1000)
-                            ->helperText('Detailed description of this document type'),
+                            ->helperText('Rincian deskripsi jenis perjanjian ini.'),
+                        */
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active Status')
                             ->default(true)
-                            ->helperText('Only active document types will be available for selection'),
+                            ->helperText('Hanya jenis perjanjian yang aktif yang bisa dipilih oleh PIC'),
                     ])->columns(2),
 
                 // New Section: Notification Settings
@@ -95,7 +97,7 @@ class MasterDocumentResource extends Resource
                             Forms\Components\CheckboxList::make('notification_recipients.default_recipients')
                                 ->label('Default Recipients')
                                 ->options([
-                                    'requester' => 'Document Requester',
+                                    'requester' => 'PIC',
                                     'supervisor' => 'Supervisor/Manager',
                                     'legal_team' => 'Legal Team',
                                     'finance' => 'Finance Team',
@@ -104,18 +106,20 @@ class MasterDocumentResource extends Resource
                                 ->default(['requester', 'supervisor'])
                                 ->columns(2),
 
+                            /*
                             Forms\Components\TagsInput::make('notification_recipients.custom_emails')
                                 ->label('Additional Email Recipients')
                                 ->helperText('Enter additional email addresses that should receive notifications')
                                 ->placeholder('email@company.com'),
+                            */
                         ])
                         ->visible(fn (Forms\Get $get) => $get('enable_notifications')),
 
                         Forms\Components\Textarea::make('notification_message_template')
                             ->label('Notification Message Template')
                             ->rows(4)
-                            ->default('Your document "{document_title}" of type "{document_type}" is due in {days_remaining} days. Please take necessary action.')
-                            ->helperText('Available variables: {document_title}, {document_type}, {days_remaining}, {requester_name}, {due_date}')
+                            ->default('Dokumen LRF Anda pada "{nama_mitra}" dengan jenis perjanjian "{jenis_perjanjian}" memiliki sisa "{hari_tersisa}" hari. Mohon segera periksa dan lakukan tindakan yang diperlukan.')
+                        //  ->helperText('Available variables: {document_title}, {document_type}, {days_remaining}, {requester_name}, {due_date}')
                             ->visible(fn (Forms\Get $get) => $get('enable_notifications')),
 
                         Forms\Components\Repeater::make('notification_settings.custom_rules')
@@ -149,12 +153,13 @@ class MasterDocumentResource extends Resource
                             ])
                             ->columns(2)
                             ->defaultItems(0)
-                            ->addActionLabel('Add Custom Rule')
+                            ->addActionLabel('Add Custom Notification')
                             ->collapsible()
                             ->visible(fn (Forms\Get $get) => $get('enable_notifications')),
                     ])
                     ->collapsible(), // Remove ->persistCollapsed()
 
+                /*
                 Forms\Components\Section::make('Required Fields Configuration')
                     ->schema([
                         Forms\Components\Repeater::make('required_fields')
@@ -232,6 +237,7 @@ class MasterDocumentResource extends Resource
                             ->columnSpanFull(),
                     ])
                     ->collapsible(), // Remove ->persistCollapsed()
+                */
             ]);
     }
 
@@ -240,23 +246,23 @@ class MasterDocumentResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('document_code')
-                    ->label('Code')
+                    ->label('Kode Perjanjian')
                     ->searchable()
                     ->sortable()
                     ->badge()
                     ->color('primary'),
                 Tables\Columns\TextColumn::make('document_name')
-                    ->label('Document Type')
+                    ->label('Jenis Perjanjian')
                     ->searchable()
                     ->sortable()
                     ->limit(50),
+                /*
                 Tables\Columns\TextColumn::make('description')
-                    ->label('Description')
+                    ->label('Deskripsi')
                     ->limit(80)
                     ->tooltip(function ($record) {
                         return $record->description;
                     }),
-                
                 // New notification columns
                 Tables\Columns\IconColumn::make('enable_notifications')
                     ->label('Notifications')
@@ -265,6 +271,7 @@ class MasterDocumentResource extends Resource
                     ->falseIcon('heroicon-o-bell-slash')
                     ->trueColor('success')
                     ->falseColor('gray'),
+                */
                 Tables\Columns\TextColumn::make('notification_range')
                     ->label('Notification Days')
                     ->getStateUsing(fn($record) => 
@@ -274,7 +281,7 @@ class MasterDocumentResource extends Resource
                     )
                     ->badge()
                     ->color(fn($state) => $state === 'Disabled' ? 'gray' : 'info'),
-                
+                /*
                 Tables\Columns\TextColumn::make('required_fields_count')
                     ->label('Required Fields')
                     ->getStateUsing(fn($record) => count($record->required_fields ?? []))
@@ -285,11 +292,15 @@ class MasterDocumentResource extends Resource
                     ->getStateUsing(fn($record) => count($record->optional_fields ?? []))
                     ->badge()
                     ->color('info'),
+                */
                 Tables\Columns\TextColumn::make('documents_count')
                     ->label('Used Count')
                     ->counts('documentRequests')
                     ->badge()
-                    ->color('success'),
+                    ->color(fn ($state) => $state > 0 ? 'success' : 'gray')
+                    ->formatStateUsing(fn ($state) => $state > 0 ? $state : 'No Documents')
+                    ->sortable(),
+
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean()
@@ -311,12 +322,14 @@ class MasterDocumentResource extends Resource
                         1 => 'Enabled',
                         0 => 'Disabled',
                     ]),
+                /*
                 Tables\Filters\Filter::make('has_custom_notification_rules')
                     ->label('Has Custom Rules')
                     ->query(fn (Builder $query): Builder => 
                         $query->whereNotNull('notification_settings')
                             ->whereJsonLength('notification_settings->custom_rules', '>', 0)
                     ),
+                */
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
@@ -378,33 +391,32 @@ class MasterDocumentResource extends Resource
                 Infolists\Components\Section::make('Document Type Details')
                     ->schema([
                         Infolists\Components\TextEntry::make('document_code')
-                            ->label('Document Code')
+                            ->label('Kode Dokumen')
                             ->badge()
                             ->color('primary'),
                         Infolists\Components\TextEntry::make('document_name')
-                            ->label('Document Type Name'),
-                        Infolists\Components\IconEntry::make('is_active')
+                            ->label('Nama Jenis Perjanjian'),
+                        Infolists\Components\TextEntry::make('is_active')
                             ->label('Status')
-                            ->boolean()
-                            ->trueIcon('heroicon-o-check-circle')
-                            ->falseIcon('heroicon-o-x-circle')
-                            ->trueColor('success')
-                            ->falseColor('danger'),
+                            ->badge()
+                            ->formatStateUsing(fn ($state) => $state ? 'Active' : 'Inactive')
+                            ->color(fn ($state) => $state ? 'success' : 'danger'),
                         Infolists\Components\TextEntry::make('documentRequests')
                             ->label('Usage Count')
                             ->getStateUsing(fn($record) => $record->documentRequests()->count())
                             ->badge()
-                            ->color('info'),
+                            ->color('info')
+                            ->placeholder('No document.'),
                     ])->columns(4),
 
                 // New notification section
                 Infolists\Components\Section::make('Notification Settings')
                     ->schema([
-                        Infolists\Components\IconEntry::make('enable_notifications')
+                        Infolists\Components\TextEntry::make('enable_notifications')
                             ->label('Notifications Enabled')
-                            ->boolean()
-                            ->trueIcon('heroicon-o-bell')
-                            ->falseIcon('heroicon-o-bell-slash'),
+                            ->badge()
+                            ->formatStateUsing(fn ($state) => $state ? 'Enabled' : 'Disabled')
+                            ->color(fn ($state) => $state ? 'success' : 'danger'),
                         Infolists\Components\TextEntry::make('warning_days')
                             ->label('Warning Days')
                             ->suffix(' days before due'),
@@ -416,14 +428,34 @@ class MasterDocumentResource extends Resource
                             ->suffix(' days before due'),
                         Infolists\Components\TextEntry::make('notification_recipients.default_recipients')
                             ->label('Default Recipients')
-                            ->formatStateUsing(fn($state) => is_array($state) ? implode(', ', $state) : 'None')
-                            ->columnSpan(2),
+                            ->html()
+                            ->formatStateUsing(function ($state) {
+                                $labels = [
+                                    'requester'   => 'PIC',
+                                    'supervisor'  => 'Supervisor/Manager',
+                                    'legal_team'  => 'Legal Team',
+                                    'finance'     => 'Finance Team',
+                                    'head_legal'  => 'Head Legal',
+                                ];
+
+                                if (empty($state)) {
+                                    return '<span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">None</span>';
+                                }
+
+                                $badges = collect($state)->map(function ($key) use ($labels) {
+                                    $label = $labels[$key] ?? $key;
+                                    return "<span class=\"px-2 py-0.5 mr-1 text-xs rounded-full bg-blue-100 text-blue-800\">{$label}</span>";
+                                })->implode('');
+
+                                return $badges;
+                            }),
                         Infolists\Components\TextEntry::make('notification_message_template')
                             ->label('Message Template')
                             ->columnSpanFull(),
                     ])->columns(4)
                     ->visible(fn($record) => $record->enable_notifications),
 
+                /*
                 Infolists\Components\Section::make('Description')
                     ->schema([
                         Infolists\Components\TextEntry::make('description')
@@ -473,8 +505,9 @@ class MasterDocumentResource extends Resource
                             ->columns(5),
                     ])
                     ->visible(fn($record) => !empty($record->optional_fields)),
+                */
 
-                Infolists\Components\Section::make('Usage Statistics')
+                Infolists\Components\Section::make('Usage History')
                     ->schema([
                         Infolists\Components\TextEntry::make('created_at')
                             ->label('Created At')
