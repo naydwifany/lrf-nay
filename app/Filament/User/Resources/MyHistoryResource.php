@@ -288,7 +288,7 @@ class MyHistoryResource extends Resource
                     ->icon('heroicon-o-document-duplicate')
                     ->color('info')
                     ->visible(fn($record) => $record->agreementOverview !== null)
-                    ->url(fn ($record) => \App\Filament\User\Resources\PendingAgreementOverviewResource::getUrl(
+                    ->url(fn ($record) => \App\Filament\User\Resources\MyApprovalResource\Pages\PendingAgreementOverviews\ViewPendingAgreementOverview::getUrl(
                         'view',
                         ['record' => $record->agreementOverview->getKey()]
                     )),

@@ -1,14 +1,14 @@
 <?php
 namespace App\Filament\Admin\Resources\DocumentRequestResource\Pages\AgreementOverviews;
 
-use App\Filament\Admin\Resources\AgreementOverviewResource;
+use App\Filament\Admin\Resources\DocumentRequestResource;
 use Filament\Resources\Pages\CreateRecord;
 use App\Models\DocumentRequest;
 use Filament\Notifications\Notification;
 
 class CreateAgreementOverview extends CreateRecord
 {
-    protected static string $resource = AgreementOverviewResource::class;
+    protected static string $resource = DocumentRequestResource::class;
 
     protected function getRedirectUrl(): string
     {

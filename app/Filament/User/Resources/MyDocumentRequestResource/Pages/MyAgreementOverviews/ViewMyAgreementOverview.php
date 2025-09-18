@@ -1,9 +1,9 @@
 <?php
-// app/Filament/User/Resources/MyAgreementOverviewResource/Pages/ViewMyAgreementOverview.php
+// app/Filament/User/Resources/MyDocumentRequestResources/Pages/MyAgreementOverviews/ViewMyAgreementOverview.php
 
-namespace App\Filament\User\Resources\MyDocumentRequestResource\Pages\MyAgreementOverviews;
+namespace App\Filament\User\Resources\MyDocumentRequestResources\Pages\MyAgreementOverviews;
 
-use App\Filament\User\Resources\MyApprovalResource;
+use App\Filament\User\Resources\MyDocumentRequestResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Notifications\Notification;
@@ -12,7 +12,7 @@ use App\Services\DocumentWorkflowService;
 
 class ViewMyAgreementOverview extends ViewRecord
 {
-    protected static string $resource = MyApprovalResource::class;
+    protected static string $resource = MyDocumentRequestResource::class;
 
     protected function getHeaderActions(): array
     {

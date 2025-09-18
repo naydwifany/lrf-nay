@@ -4,9 +4,12 @@
 namespace App\Filament\User\Resources;
 
 use App\Filament\User\Resources\MyApprovalResource\Pages;
-use App\Filament\User\Resources\MyApprovalResource\Pages\PendingAgreementOverview;
+use App\Filament\User\Resources\MyApprovalResource\Pages\PendingAgreementOverviews;
+use App\Filament\User\Resources\MyApprovalResource\Pages\PendingAgreementOverviews\ViewPendingAgreementOverview;
 use App\Models\DocumentRequest;
+use App\Models\AgreementOverview;
 use App\Services\DocumentRequestService;
+use App\Services\DocumentWorkflowService;
 use App\Services\NotificationService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -22,7 +25,7 @@ use Filament\Support\Enums\FontWeight;
 
 class MyApprovalResource extends Resource
 {
-    protected static ?string $model = DocumentRequest::class;
+    protected static ?string $model = null; 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
     protected static ?string $navigationLabel = 'Pending Approvals';
     protected static ?string $modelLabel = 'Approval Request';
@@ -50,30 +53,137 @@ class MyApprovalResource extends Resource
                 // METHOD 2: Documents where user should be approver based on workflow logic
                 // This handles cases where approval records might not be created yet
                 $query->orWhere(function ($q) use ($user) {
-                    // SUPERVISOR/MANAGER APPROVALS
+                    // SUPERVISOR/MANAGER APPROVALS LRF
                     if (static::isSupervisorLevel($user)) {
                         $q->where('status', 'pending_supervisor')
                           ->where('nik_atasan', $user->nik);
                     }
                     
-                    // GENERAL MANAGER APPROVALS
+                    // GENERAL MANAGER APPROVALS LRF
                     if (static::isGeneralManagerLevel($user)) {
                         $q->orWhere('status', 'pending_gm');
                     }
                     
-                    // LEGAL ADMIN APPROVALS
+                    // LEGAL ADMIN APPROVALS LRF
                     if (static::isLegalAdminLevel($user)) {
                         $q->orWhere('status', 'pending_legal_admin')
                           ->orWhere('status', 'pending_legal');
                     }
+
+                });
+
+                $query->orWhere(function ($q) use ($user) {
+                    // AO Pending Head
+                    $q->orWhere(function ($qq) use ($user) {
+                        $qq->where('status', 'pending_head')
+                        ->where('head_id', $user->nik); // atau kolom user yang ditunjuk sebagai head
+                    });
+
+                    // AO Pending GM
+                    $q->orWhere(function ($qq) use ($user) {
+                        $qq->where('status', 'pending_gm')
+                        ->where('gm_id', $user->nik);
+                    });
+
+                    // AO Pending Head Finance: Bu Ovy
+                    if ($user->nik === '1305480') {
+                        $q->orWhere('status', 'pending_finance');
+                    }
+
+                    // AO Pending Head Legal: Bu Ice atau Pak Widi
+                    if (in_array($user->nik, ['23070180', '20050037'])) {
+                        // AO Pending Legal
+                        $q->orWhere(function ($qq) use ($user) {
+                            if (in_array($user->nik, ['23070180', '20050037'])) {
+                                $qq->where('status', 'pending_legal')
+                                ->whereHas('pic', function ($qpic) use ($user) {
+                                    if ($user->nik === '23070180') {
+                                        // cek direktorat atau divisi sesuai Ice Trisna Wati
+                                        $qpic->whereIn('direktorat', [
+                                            'Site Development, General Affair & Legal',
+                                            'After Sales',
+                                            'Grooceries',
+                                            'Niscaya Raharja Cahaya',
+                                            'Corporate Secretary, Legal & Business Development',
+                                        ])->orWhereIn('divisi', [
+                                            'Corporate Secretary',
+                                            'Legal',
+                                            'Business Development & Site Development',
+                                            'General Affair',
+                                            'Corporate Secretary, Legal & Business Development',
+                                        ]);
+                                    } elseif ($user->nik === '20050037') {
+                                        // cek direktorat atau divisi sesuai Widi Satya Chitra
+                                        $qpic->whereIn('direktorat', [
+                                            'Finance Accounting, Information Technology & Human Resources',
+                                            'Merchandising & Marketing',
+                                            'Retail Sales Operation',
+                                            'Wholesales & Grooceries',
+                                            'Internal Audit',
+                                            'Retail Sales & Logistic',
+                                            'Wholesales',
+                                            'Finance, Accounting & Information Technology'
+                                        ])->orWhereIn('divisi', [
+                                            'Finance',
+                                            'Accounting & Inventory',
+                                            'Information Technology',
+                                            'Human Resources',
+                                            'Payroll',
+                                            'Merchandising 1',
+                                            'Merchandising 2',
+                                            'Product Administration',
+                                            'Supply & Demand Planning',
+                                            'Marketing',
+                                            'CRM & Event',
+                                            'Sales Offline',
+                                            'Logistic',
+                                            'Sales Online (E-Commerce)',
+                                            'Central Purchasing',
+                                            'Wholesales',
+                                            'Internal Audit',
+                                            'Finance, Accounting & Information Technology',
+                                            'Merchandising & Marketing',
+                                            'Retail Sales & Logistic',
+                                            'Accounting'
+                                        ]);
+                                    }
+                                });
+                            }
+                        });
+                    }
+
+                    // AO Pending Director1
+                    $q->orWhere(function ($qq) use ($user) {
+                        $qq->where('status', 'pending_director1')
+                        ->whereHas('pic', function ($qpic) use ($user) {
+                            $qpic->where('direktur_id', $user->nik); // kolom direktur yang otomatis ditarik dari PIC
+                        });
+                    });
+
+                    // AO Pending Director2
+                    $q->where('status', 'pending_director2')
+                    ->whereHas('pic', fn($qpic) => $qpic->where('director2_id', $user->nik))
+                    ->whereDoesntHave('approvals', fn($qa) =>
+                        $qa->where('approver_nik', $user->nik)
+                            ->whereIn('status', ['approved', 'rejected'])
+                    );
                 });
             })
             ->where('is_draft', false) // Only submitted documents
             ->whereIn('status', [
+                // LRF
                 'pending_supervisor',
                 'pending_gm', 
                 'pending_legal_admin',
-                'pending_legal'
+                'pending_legal',
+
+                // AO
+                'pending_head',
+                'pending_gm',
+                'pending_finance',
+                'pending_legal',
+                'pending_director1',
+                'pending_director2',
             ]);
     }
 
@@ -315,10 +425,11 @@ class MyApprovalResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make()
                     ->label('View LRF'),
-                Tables\Actions\Action::make('view_pending_ao')
-                    ->label('View Pending AO')
+                Tables\Actions\Action::make('view_ao')
+                    ->label('View AO')
                     ->icon('heroicon-o-eye')
-                    ->url(fn ($record) => PendingAgreementOverview::getUrl(['record' => $record->id])),
+                    ->url(fn ($record) => static::getUrl('view_ao', ['record' => $record->getKey()]))
+            ])
                 
                 /* approve/reject move to infolist below
                 Tables\Actions\Action::make('approve')
@@ -444,7 +555,6 @@ class MyApprovalResource extends Resource
                     ->modalHeading('Reject Document Request')
                     ->modalDescription('Are you sure you want to reject this document request?'),
                 */
-            ])
 
             ->bulkActions([])
             ->defaultSort('submitted_at', 'asc')
@@ -506,9 +616,10 @@ class MyApprovalResource extends Resource
         };
     }
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(Infolist $infolist, $type = 'lrf'): Infolist
     {
-        return $infolist
+        if ($type === 'lrf') {
+            return $infolist
             ->schema([
                 Infolists\Components\Section::make('Document Overview')
                     ->schema([
@@ -826,12 +937,13 @@ class MyApprovalResource extends Resource
 
                 Infolists\Components\Section::make('📊 Approval History')
                     ->schema([
-                        Infolists\Components\RepeatableEntry::make('approvals')
+                        Infolists\Components\RepeatableEntry::make('approvalHistory')
+                            ->getStateUsing(fn($record) => $record->approvalHistory()) 
                             ->schema([
-                                Infolists\Components\TextEntry::make('approver_name')
+                                Infolists\Components\TextEntry::make('name')
                                     ->label('👤 Approver')
                                     ->weight(FontWeight::Medium),
-                                Infolists\Components\TextEntry::make('approval_type')
+                                Infolists\Components\TextEntry::make('role')
                                     ->label('🏷️ Role')
                                     ->formatStateUsing(fn($state) => match($state) {
                                         'supervisor' => '👨‍💼 Supervisor',
@@ -849,7 +961,7 @@ class MyApprovalResource extends Resource
                                         'rejected' => 'danger',
                                         default => 'gray'
                                     }),
-                                Infolists\Components\TextEntry::make('approved_at')
+                                Infolists\Components\TextEntry::make('date')
                                     ->label('📅 Date')
                                     ->dateTime()
                                     ->since()
@@ -985,14 +1097,209 @@ class MyApprovalResource extends Resource
                             ->canUserApproveDocument($record, auth()->user());
                     }),
             ]);
+        } else if ($type === 'ao') {
+        return $infolist
+            ->schema([
+                Infolists\Components\Section::make('Agreement Overview Details')
+                    ->schema([
+                        Infolists\Components\Grid::make(3)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('nomor_dokumen')
+                                    ->label('AO Number')
+                                    ->copyable(),
+                                Infolists\Components\TextEntry::make('status')
+                                    ->badge()
+                                    ->color(fn (string $state): string => AgreementOverview::getStatusColors()[$state] ?? 'gray'),
+                                Infolists\Components\TextEntry::make('tanggal_ao')
+                                    ->label('AO Date')
+                                    ->date(),
+                            ]),
+                        
+                        Infolists\Components\Grid::make(3)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('counterparty')
+                                    ->label('Counterparty'),
+                                Infolists\Components\TextEntry::make('pic')
+                                    ->label('PIC'),
+                            ]),
+                    ]),
+
+                Infolists\Components\Section::make('Source Document')
+                    ->schema([
+                        Infolists\Components\Grid::make(3)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('lrfDocument.title')
+                                    ->label('Document Title'),
+                                Infolists\Components\TextEntry::make('lrfDocument.doctype.document_name')
+                                    ->label('Document Type')
+                                    ->badge(),
+                                Infolists\Components\TextEntry::make('lrfDocument.nomor_dokumen')
+                                    ->label('Document Number'),
+                            ]),
+                    ]),
+
+                Infolists\Components\Section::make('Requester Information')
+                    ->schema([
+                        Infolists\Components\Grid::make(3)
+                            ->schema([
+                                Infolists\Components\TextEntry::make('creator.name')
+                                    ->label('Requested By'),
+                                Infolists\Components\TextEntry::make('creator.jabatan')
+                                    ->label('Position'),
+                                Infolists\Components\TextEntry::make('creator.divisi')
+                                    ->label('Division')
+                                    ->badge(),
+                            ]),
+                    ]),
+
+                Infolists\Components\Section::make('Agreement Content')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('deskripsi')
+                            ->label('Description')
+                            ->columnSpanFull(),
+                        Infolists\Components\TextEntry::make('resume')
+                            ->label('Executive Summary')
+                            ->html()
+                            ->columnSpanFull(),
+                        Infolists\Components\TextEntry::make('ketentuan_dan_mekanisme')
+                            ->label('Terms and Mechanisms')
+                            ->html()
+                            ->columnSpanFull(),
+                    ]),
+
+                // Workflow Steps Visual
+                Infolists\Components\Section::make('Workflow Progress')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('workflow_steps')
+                            ->getStateUsing(function ($record) {
+                                $steps = [
+                                    'draft' => '📝 Draft',
+                                    'pending_head' => '👨‍💼 Head Review',
+                                    'pending_gm' => '🎯 GM Review',
+                                    'pending_finance' => '💰 Finance Review',
+                                    'pending_legal' => '⚖️ Legal Review',
+                                    'pending_director1' => '👔 Director 1 Review',
+                                    'pending_director2' => '👔 Director 2 Review',
+                                    'approved' => '✅ Fully Approved',
+                                ];
+
+                                $currentStatus = $record->status;
+                                $stepKeys = array_keys($steps);
+                                $currentIndex = array_search($currentStatus, $stepKeys);
+                                $html = '<div class="space-y-2">';
+
+                                foreach ($steps as $stepStatus => $stepLabel) {
+                                    $stepIndex = array_search($stepStatus, $stepKeys);
+                                    $isCompleted = $stepIndex < $currentIndex || $currentStatus === 'approved';
+                                    $isCurrent = $stepStatus === $currentStatus;
+
+                                    if ($isCompleted) {
+                                        $html .= "<div class='text-green-600 font-medium'>✅ {$stepLabel}</div>";
+                                    } elseif ($isCurrent) {
+                                        $html .= "<div class='text-blue-600 font-bold'>🔄 {$stepLabel} (Current)</div>";
+                                    } else {
+                                        $html .= "<div class='text-gray-400'>⏳ {$stepLabel}</div>";
+                                    }
+                                }
+
+                                $html .= '</div>';
+                                return $html;
+                            })
+                            ->html()
+                            ->columnSpanFull()
+                            ->visible(fn($record) => !$record->is_draft),
+                    ])
+                    ->columns(2),
+                
+                // Enhanced Action Buttons
+                Infolists\Components\Section::make('🎯 Approval Actions')
+                    ->description('Review the Agreement Overview carefully and make your decision')
+                    ->schema([
+                        Infolists\Components\Actions::make([
+                            Infolists\Components\Actions\Action::make('approve')
+                                ->label('✅ Approve Document')
+                                ->icon('heroicon-o-check-circle')
+                                ->color('success')
+                                ->size('lg')
+                                ->visible(fn (AgreementOverview $record) =>
+                                    app(DocumentWorkflowService::class)
+                                        ->canUserApproveAgreementOverview(auth()->user(), $record)
+                                )
+                                ->form([
+                                    Forms\Components\Textarea::make('approval_comments')
+                                        ->label('Approval Comments')
+                                        ->rows(3)
+                                        ->helperText('Optional: Add your comments for this approval'),
+                                ])
+                                ->action(function (AgreementOverview $record, array $data) {
+                                    $workflowService = app(DocumentWorkflowService::class);
+
+                                    $workflowService->approveAgreementOverview(
+                                        $record,
+                                        auth()->user(),
+                                        $data['approval_comments'] ?? 'Approved'
+                                    );
+
+                                    Notification::make()
+                                        ->title('Agreement Overview Approved')
+                                        ->body('The Agreement Overview has been successfully approved.')
+                                        ->success()
+                                        ->send();
+                                })
+                                ->requiresConfirmation()
+                                ->modalHeading('✅ Approve Agreement Overview')
+                                ->modalDescription('Are you sure you want to approve this Agreement Overview?'),
+
+                            Infolists\Components\Actions\Action::make('reject')
+                                ->label('❌ Reject Document')
+                                ->icon('heroicon-o-x-circle')
+                                ->color('danger')
+                                ->size('lg')
+                                ->modalHeading('Reject Agreement Overview')
+                                ->modalDescription('Are you sure you want to reject this Agreement Overview?')
+                                ->modalSubmitActionLabel('Reject')
+                                ->visible(fn (AgreementOverview $record) =>
+                                    auth()->user()->role === 'director' &&
+                                    app(DocumentWorkflowService::class)
+                                        ->canUserApproveAgreementOverview(auth()->user(), $record)
+                                )
+                                ->action(function (AgreementOverview $record, array $data) {
+                                    $workflowService = app(DocumentWorkflowService::class);
+
+                                    $workflowService->rejectAgreementOverview(
+                                        $record,
+                                        auth()->user(),
+                                        $data['rejection_reason']
+                                    );
+
+                                    Notification::make()
+                                        ->title('Agreement Overview Rejected')
+                                        ->body('The agreement overview has been rejected and returned to the requester.')
+                                        ->danger()
+                                        ->send();
+                                })
+                                ->form([
+                                    Forms\Components\Textarea::make('rejection_reason')
+                                        ->label('Rejection Reason')
+                                        ->required()
+                                        ->rows(3)
+                                        ->helperText('Please provide a clear reason for rejection'),
+                                ])
+                                ->requiresConfirmation(),
+                        ])->columnSpanFull(),
+                    ]),
+            ]);
+        }
+
+        return $infolist;
     }
 
     public static function getPages(): array
     {
         return [
             'index'     => Pages\ListMyApprovals::route('/'),
-            'view'      => Pages\ViewMyApproval::route('/{record}'),
-            'view_ao'   => Pages\PendingAgreementOverview::route('/{record}/ao')
+            'view'      => Pages\ViewMyApproval::route('/lrf/{record}'),
+            'view_ao'   => Pages\ViewPendingAO::route('/ao/{record}'),
         ];
     }
 

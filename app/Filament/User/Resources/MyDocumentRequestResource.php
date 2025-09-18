@@ -376,7 +376,6 @@ class MyDocumentRequestResource extends Resource
                         'warning' => 'pending_supervisor',
                         'info'    => 'pending_gm',
                         'primary' => ['pending_legal', 'pending_legal_admin'],
-                        'gray'    => 'submitted',
                         'purple'  => \App\Models\AgreementOverview::STATUS_PENDING_HEAD,
                         'success' => \App\Models\AgreementOverview::STATUS_APPROVED,
                         'danger'  => \App\Models\AgreementOverview::STATUS_REJECTED,
@@ -487,7 +486,6 @@ class MyDocumentRequestResource extends Resource
                         'approved'             => 'Approved',
                         'rejected'             => 'Rejected',
                         'draft'                => 'Draft',
-                        'submitted'            => 'Submitted',
                         'discussion'           => 'In Discussion',
                     ])
                     ->searchable(),
@@ -534,8 +532,8 @@ class MyDocumentRequestResource extends Resource
                             // Update document status
                             $record->update([
                                 'is_draft' => false,
-                                'status' => 'submitted',
-                                'submitted_at' => now(),
+                                'status' => 'pending_supervisor', // langsung ke pending supervisor
+                                'submitted_at' => now(), // tetap untuk tracking kapan submit
                             ]);
                             
                             // Trigger workflow - with error handling
@@ -991,7 +989,6 @@ class MyDocumentRequestResource extends Resource
                                 'warning' => 'pending_supervisor',
                                 'info'    => 'pending_gm',
                                 'primary' => ['pending_legal', 'pending_legal_admin'],
-                                'gray'    => 'submitted',
 
                                 // AO stages
                                 'purple'  => \App\Models\AgreementOverview::STATUS_PENDING_HEAD,
@@ -1241,7 +1238,11 @@ class MyDocumentRequestResource extends Resource
                             ->placeholder('Not submitted'),
                         Infolists\Components\TextEntry::make('completed_at')
                             ->label('Selesai')
-                            ->dateTime('M d, Y H:i'),
+                            ->formatStateUsing(fn($state) =>
+                                $state
+                                    ? \Carbon\Carbon::parse($state)->format('M d, Y H:i')
+                                    : 'Dalam proses.'
+                            ),
                     ])->columns(3),
 
                 // APPROVAL HISTORY

@@ -1,5 +1,5 @@
 <?php
-// app/Filament/User/Resources/MyAgreementOverviewResource.php
+// app/Filament/User/Resources/MyAgreementOverview.php
 // UPDATED VERSION WITH FIXED FORM AND SERVICE INTEGRATION
 
 namespace App\Filament\User\Resources\MyDocumentRequestResource\Pages;
@@ -27,7 +27,22 @@ class MyAgreementOverview extends Page
 {
     use DirectorManagementTrait;
     
-    protected static ?string $model = AgreementOverview::class;
+    // ⚠️ Bagian penting untuk edit/add:
+    protected static ?string $model = null; 
+    // ➜ jangan fix ke AgreementOverview, karena nanti kita pakai polymorphic atau query gabungan AO + LRF
+
+    // ⚠️ Tambahkan method untuk menampilkan list sesuai user login
+    protected static function getTableQueryForMyApprovals($type = 'ao')
+    {
+        if ($type === 'ao') {
+            return AgreementOverview::query()
+                ->whereHas('workflowApprovers', fn($q) => $q->where('user_id', auth()->id()));
+        } else if ($type === 'lrf') {
+            return DocumentRequest::query()
+                ->whereHas('workflowApprovers', fn($q) => $q->where('user_id', auth()->id()));
+        }
+        return null;
+    }
     protected static ?string $navigationIcon = 'heroicon-o-document-duplicate';
     protected static ?string $navigationLabel = 'My Agreement Overviews';
     protected static ?string $modelLabel = 'My Agreement Overview';

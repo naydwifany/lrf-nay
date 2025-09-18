@@ -1,5 +1,5 @@
 <?php
-// app/Filament/Admin/Resources/AgreementOverviewResource/Pages/ViewAgreementOverview.php
+// app/Filament/Admin/Resources/DocumentRequestResource/Pages/AgreementOverviews/ViewAgreementOverview.php
 
 namespace App\Filament\Admin\Resources\DocumentRequestResource\Pages\AgreementOverviews;
 
@@ -25,7 +25,7 @@ class ViewAgreementOverview extends ViewRecord
             Actions\EditAction::make()
                 ->visible(fn() => $this->record->is_draft),
 
-            /* approve/reject/send to rediscussion buttons move to below at infolist in AgreementOverviewResource.php
+            /* approve/reject/send to rediscussion buttons move to below at infolist in ViewAgreementOverview.php
             Actions\Action::make('approve')
                 ->label('Approve')
                 ->icon('heroicon-o-check-circle')
